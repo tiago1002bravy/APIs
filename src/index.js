@@ -52,7 +52,7 @@ app.post('/webhook', (req, res) => {
 app.post('/format-array', (req, res) => {
     const { uuids } = req.body;
     if (!uuids || typeof uuids !== 'string') {
-        return res.status(400).send('Envie o campo "uuids" como string.');
+        return res.status(400).send('');
     }
     const array = uuids.split(',').map(u => u.trim()).filter(Boolean);
     const resultado = `[${array.map(u => `"${u}"`).join(', ')}]`;
@@ -80,10 +80,7 @@ app.get('/', (req, res) => {
 
 // Middleware para tratar rotas não encontradas
 app.use((req, res) => {
-    res.status(404).json({
-        success: false,
-        message: 'Rota não encontrada'
-    });
+    res.status(404).send('');
 });
 
 app.listen(port, () => {
