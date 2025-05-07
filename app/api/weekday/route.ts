@@ -1,5 +1,15 @@
 import { type NextRequest, NextResponse } from "next/server";
 
+const DIAS_SEMANA = [
+  "Domingo",
+  "Segunda-feira",
+  "Terça-feira",
+  "Quarta-feira",
+  "Quinta-feira",
+  "Sexta-feira",
+  "Sábado"
+];
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -22,9 +32,12 @@ export async function POST(req: NextRequest) {
     }
 
     const diaSemana = dataObj.getDay();
+    const diaMes = dataObj.getDate();
 
     return NextResponse.json({
-      dia: diaSemana.toString()
+      dia: diaSemana.toString(),
+      dia_semana: DIAS_SEMANA[diaSemana],
+      dia_mes: diaMes
     });
   } catch (error) {
     return NextResponse.json(
