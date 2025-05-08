@@ -38,11 +38,8 @@ export async function POST(req: NextRequest) {
       .map(servico => SERVICOS[servico as keyof typeof SERVICOS])
       .filter(id => id !== undefined);
 
-    // Junta os IDs com vírgula
-    const resultado = ids.join(",");
-
     return NextResponse.json({
-      value_id: resultado
+      value_id: ids
     });
   } catch (error) {
     return NextResponse.json(
