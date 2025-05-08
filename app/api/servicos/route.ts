@@ -38,9 +38,7 @@ export async function POST(req: NextRequest) {
       .map(servico => SERVICOS[servico as keyof typeof SERVICOS])
       .filter(id => id !== undefined);
 
-    return NextResponse.json({
-      value_id: ids
-    });
+    return NextResponse.json(ids);
   } catch (error) {
     return NextResponse.json(
       { erro: "Erro ao processar a requisição" },
