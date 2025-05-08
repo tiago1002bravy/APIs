@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
     
     // Mapeia os nomes dos serviços para seus IDs
     const ids = servicos
-      .map(servico => SERVICOS[servico])
+      .map(servico => SERVICOS[servico as keyof typeof SERVICOS])
       .filter(id => id !== undefined);
 
     // Junta os IDs com vírgula
