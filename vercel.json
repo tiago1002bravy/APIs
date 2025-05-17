@@ -2,18 +2,18 @@
     "version": 2,
     "builds": [
         {
-            "src": "main.py",
+            "src": "green/app/main.py",
             "use": "@vercel/python"
         }
     ],
     "routes": [
         {
-            "src": "/",
-            "dest": "main.py"
+            "src": "/api/dados-green",
+            "dest": "green/app/main.py"
         },
         {
             "src": "/(.*)",
-            "dest": "main.py"
+            "dest": "green/app/main.py"
         }
     ]
 } 
