@@ -9,11 +9,15 @@
     "routes": [
         {
             "src": "/api/dados-green",
-            "dest": "green/app/main.py"
+            "dest": "/green/app/main.py"
+        },
+        {
+            "src": "/api/dados-green/(.*)",
+            "dest": "/green/app/main.py"
         },
         {
             "src": "/(.*)",
-            "dest": "green/app/main.py"
+            "dest": "/green/app/main.py"
         }
     ]
 } 

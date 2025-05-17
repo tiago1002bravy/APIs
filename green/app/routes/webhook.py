@@ -8,7 +8,7 @@ from typing import Any, Dict, Optional
 from ..core.config import STATUS_TO_ACAO, PRODUCT_NAME_TO_PRODUTO
 from ..utils.extractors import extract_field
 
-router = APIRouter()
+router = APIRouter(prefix="/api")
 
 @router.post("/dados-green", tags=["webhook"])
 async def process_webhook(request: Request):
