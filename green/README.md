@@ -53,6 +53,6 @@ A documentação interativa da API estará disponível em:
 
 ## Rotas
 
-- `POST /` ou `POST /api/webhook`: Processa webhooks de eventos
+- `POST /dados-green`: Processa webhooks de eventos
   - Aceita eventos de venda e checkout abandonado
   - Retorna dados processados em formato padronizado 

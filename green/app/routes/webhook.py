@@ -10,8 +10,7 @@ from ..utils.extractors import extract_field
 
 router = APIRouter()
 
-@router.post("/", tags=["webhook"])
-@router.post("/api/webhook", tags=["webhook"])  # Rota alternativa
+@router.post("/dados-green", tags=["webhook"])
 async def process_webhook(request: Request):
     try:
         payload: Dict[str, Any] = await request.json()
