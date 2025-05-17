@@ -307,31 +307,28 @@ async def add_tag_to_task(task_id: str, tag: str, api_token: str) -> Dict[str, A
 async def process_task_webhook(request: Request):
     try:
         raw_payload = await request.json()
-        
         # Se for uma lista, pega o primeiro item
         if isinstance(raw_payload, list):
             if not raw_payload:
                 raise HTTPException(status_code=400, detail="Lista de payload vazia")
             webhook_data = raw_payload[0]
             payload = webhook_data.get('body', {})
-            
-            # Extrair token do header do webhook se disponível
             webhook_token = webhook_data.get('headers', {}).get('x-webhook-token')
         else:
             payload = raw_payload
             webhook_token = None
-
         if not isinstance(payload, dict):
             raise HTTPException(status_code=400, detail="Invalid JSON payload: root must be an object or array of objects.")
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid or malformed JSON payload: {str(e)}")
 
-    # Extrair token da API dos headers
+    # Remover obrigatoriedade do token
     api_token = request.headers.get("Authorization")
     if not api_token and webhook_token:
         api_token = webhook_token
-    if not api_token:
-        raise HTTPException(status_code=401, detail="API token não fornecido")
+    # Se não houver token, apenas continue (não levanta erro)
+    #if not api_token:
+    #    raise HTTPException(status_code=401, detail="API token não fornecido")
 
     # Validar tipo de webhook
     payload_type = payload.get("type")
