@@ -25,20 +25,24 @@ async def create_clickup_task(request: Request):
         # Extrai os campos necessários usando os mesmos caminhos do webhook original
         nome_paths = [["client", "name"], ["lead", "name"]]
         email_paths = [["client", "email"], ["lead", "email"]]
-        telefone_paths = [["client", "cellphone"], ["lead", "cellphone"]]
+        whatsapp_paths = [["client", "cellphone"], ["lead", "cellphone"]]
         valor_paths = [["sale", "amount"]]
+        produto_paths = [["product", "name"]]
+        status_paths = [["sale", "status"], ["currentStatus"], ["oldStatus"]]
 
         # Extrai os dados
         nome = extract_field(payload, nome_paths)
         email = extract_field(payload, email_paths)
-        telefone = extract_field(payload, telefone_paths)
+        whatsapp = extract_field(payload, whatsapp_paths)
         raw_valor = extract_field(payload, valor_paths)
+        produto = extract_field(payload, produto_paths)
+        status = extract_field(payload, status_paths)
 
         # Valida os dados obrigatórios
-        if not all([nome, email, telefone, raw_valor]):
+        if not all([nome, email, whatsapp, raw_valor]):
             raise HTTPException(
                 status_code=400,
-                detail="Dados incompletos. São necessários: nome, email, telefone e valor"
+                detail="Dados incompletos. São necessários: nome, email, whatsapp e valor"
             )
 
         # Converte o valor para inteiro
@@ -52,6 +56,38 @@ async def create_clickup_task(request: Request):
                 status_code=400,
                 detail="Valor inválido. Deve ser um número"
             )
+
+        # Mapeia o status para a ação
+        STATUS_TO_ACAO = {
+            "waiting_payment": "aguardando-pagamento",
+            "paid": "comprador",
+            "refused": "recusada",
+            "refunded": "reembolsada",
+            "chargedback": "chargeback",
+            "abandoned": "abandonada",
+        }
+
+        # Mapeia o produto
+        PRODUCT_NAME_TO_PRODUTO = {
+            "Mentoria Black": "mentoria-black",
+            "Implementação Bravy": "implementacao-bravy",
+            "Bravy Club": "bravy-club",
+            "Floow PRO": "floow-pro",
+            "Bravy Black": "bravy-black",
+            "ClickUp Pro": "clickup-pro",
+            "Club+Floow": "club+floow",
+            "ClickUp Start": "clickup-start",
+            "CRM Automatizado": "crm-automatizado",
+        }
+
+        # Determina a ação
+        acao = STATUS_TO_ACAO.get(status.lower() if status else "abandoned", "abandonada")
+        
+        # Determina o produto
+        produto_final = PRODUCT_NAME_TO_PRODUTO.get(produto) if produto else None
+        
+        # Cria a tag
+        tag = f"{acao}-{produto_final}" if produto_final else acao
 
         # Inicializa o serviço do ClickUp
         clickup_service = ClickUpService()
@@ -71,8 +107,9 @@ async def create_clickup_task(request: Request):
         task = await clickup_service.create_task(
             nome=nome,
             email=email,
-            telefone=telefone,
-            valor=valor
+            whatsapp=whatsapp,
+            valor=valor,
+            tag=tag
         )
 
         return JSONResponse(
