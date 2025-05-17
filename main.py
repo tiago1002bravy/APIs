@@ -65,30 +65,20 @@ async def process_webhook(request: Request):
         email_paths = [["lead", "email"]]
         telefone_paths = [["lead", "cellphone"]]
     else: # Lógica para eventos de venda (ou default)
-        nome_paths = [["nome"], ["name"], ["buyer", "name"], ["client", "name"], ["customer", "name"]]
-        email_paths = [["email"], ["buyer", "email"], ["client", "email"], ["customer", "email"]]
-        telefone_paths = [
-            ["client", "cellphone"], 
-            ["telefone"], ["phone"], ["buyer", "phone"], ["client", "phone"], ["customer", "phone"]
-        ]
+        nome_paths = [["client", "name"]]  # Simplificado para usar apenas client.name
+        email_paths = [["client", "email"]]  # Simplificado para usar apenas client.email
+        telefone_paths = [["client", "cellphone"]]  # Simplificado para usar apenas client.cellphone
     
     # produto_original_paths e valor_paths são genéricos o suficiente para ambos os casos
-    produto_original_paths = [
-        ["produto"], ["product"], ["product_name"], ["product", "name"], ["item", "name"], 
-        ["produto", "nome"], ["produto_nome"]
-    ]
+    produto_original_paths = [["product", "name"]]  # Simplificado para usar apenas product.name
     
     # Caminhos para status, com prioridade ajustada (usado apenas se não for checkout_abandoned)
     status_sale_paths = [["sale", "status"]] 
-    status_current_paths = [["currentStatus"], ["current_status"], ["status"]]
-    status_old_paths = [["oldStatus"], ["old_status"]]
+    status_current_paths = [["currentStatus"]]  # Simplificado
+    status_old_paths = [["oldStatus"]]  # Simplificado
     
-    valor_paths = [
-        ["sale", "amount"], 
-        ["valor"], ["value"], ["amount"], ["price"], ["purchase", "value"], ["purchase", "amount"],
-        ["product", "amount"] 
-    ]
-    seller_balance_paths = [["sale", "seller_balance"]] # Novo caminho para seller_balance
+    valor_paths = [["sale", "amount"]]  # Simplificado para usar apenas sale.amount
+    seller_balance_paths = [["sale", "seller_balance"]]  # Para o campo liquidado
 
     # 1. Extrair nome
     raw_nome = extract_field(payload, nome_paths)
