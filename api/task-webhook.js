@@ -1,4 +1,6 @@
 const axios = require('axios');
+const express = require('express');
+const app = express();
 
 // Constantes (mesmas do FastAPI)
 const TASK_API_BASE_URL = "https://api.clickup.com/api/v2";
@@ -182,13 +184,11 @@ async function addTagToTask(taskId, tag, apiToken) {
     }
 }
 
-// Handler principal da rota
-module.exports = async (req, res) => {
-    // Permitir apenas POST
-    if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Método não permitido' });
-    }
+// Configurar o express para parsear JSON
+app.use(express.json());
 
+// Handler da rota
+app.post('/api/task-webhook', async (req, res) => {
     try {
         // Extrair payload
         let rawPayload = req.body;
@@ -347,4 +347,7 @@ module.exports = async (req, res) => {
         console.error('Erro ao processar webhook:', error);
         return res.status(500).json({ error: 'Erro interno do servidor', details: error.message });
     }
-}; 
+});
+
+// Exportar o app para a Vercel
+module.exports = app; 

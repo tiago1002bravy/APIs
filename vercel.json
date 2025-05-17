@@ -8,7 +8,10 @@
     ],
     "routes": [
         {
-            "src": "/api/task-webhook",
+            "handle": "filesystem"
+        },
+        {
+            "src": "/(.*)",
             "dest": "/api/task-webhook.js"
         }
     ]
