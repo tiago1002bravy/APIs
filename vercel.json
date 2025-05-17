@@ -2,17 +2,14 @@
     "version": 2,
     "builds": [
         {
-            "src": "api/task-webhook.js",
+            "src": "api/dados-green.js",
             "use": "@vercel/node"
         }
     ],
     "routes": [
         {
-            "handle": "filesystem"
-        },
-        {
-            "src": "/(.*)",
-            "dest": "/api/task-webhook.js"
+            "src": "/api/dados-green",
+            "dest": "/api/dados-green.js"
         }
     ]
 } 
