@@ -46,7 +46,8 @@ def extract_field(data: Dict[str, Any], possible_paths: List[List[str]]) -> Opti
             return value
     return None
 
-@app.post("/")
+@app.post("/", tags=["webhook"])
+@app.post("/api/webhook", tags=["webhook"])  # Rota alternativa
 async def process_webhook(request: Request):
     try:
         payload: Dict[str, Any] = await request.json()
