@@ -138,21 +138,14 @@ module.exports = async (req, res) => {
         if (lead) {
             return res.status(200).json([{
                 "task id": lead.id,
-                "name": lead.name,
-                "email": email,
-                "status": lead.status?.status,
-                "tags": lead.tags,
-                "custom_fields": lead.custom_fields
+                "operacao": "task existente"
             }]);
         } else {
             // Criar nova task quando lead não for encontrado
             const newTask = await createTask(email, nome_lead, phone_lead, valor);
             return res.status(200).json([{
                 "task id": newTask.id,
-                "name": newTask.name,
-                "email": email,
-                "status": newTask.status?.status,
-                "custom_fields": newTask.custom_fields
+                "operacao": "nova task"
             }]);
         }
 
