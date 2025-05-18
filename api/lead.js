@@ -60,20 +60,16 @@ module.exports = async (req, res) => {
 
         if (lead) {
             return res.status(200).json({
-                message: 'Lead encontrado',
-                lead: {
-                    id: lead.id,
-                    name: lead.name,
-                    email: email_lead,
-                    status: lead.status?.status,
-                    tags: lead.tags,
-                    custom_fields: lead.custom_fields
-                }
+                "task id": lead.id,
+                "name": lead.name,
+                "email": email_lead,
+                "status": lead.status?.status,
+                "tags": lead.tags,
+                "custom_fields": lead.custom_fields
             });
         } else {
-            return res.status(404).json({
-                message: 'Lead não encontrado',
-                email: email_lead
+            return res.status(200).json({
+                "task id": "não encontrado"
             });
         }
 
