@@ -148,7 +148,7 @@ module.exports = async (req, res) => {
     }
 
     try {
-        const { email_lead, nome_lead, phone_lead, valor, acao, tag } = req.body;
+        const { email_lead, nome_lead, phone_lead, valor, acao, tag, produto } = req.body;
 
         // Validar email
         if (!email_lead || typeof email_lead !== 'string' || !email_lead.trim()) {
@@ -172,10 +172,13 @@ module.exports = async (req, res) => {
             if (tag) {
                 await addTagToTask(taskId, tag);
             }
+            if (produto) {
+                await addTagToTask(taskId, produto);
+            }
             return res.status(200).json([{
                 "task id": taskId,
                 "operacao": "task existente",
-                "tags_adicionadas": { acao, tag }
+                "tags_adicionadas": { acao, tag, produto }
             }]);
         } else {
             // Criar nova task quando lead não for encontrado
@@ -189,11 +192,14 @@ module.exports = async (req, res) => {
             if (tag) {
                 await addTagToTask(taskId, tag);
             }
+            if (produto) {
+                await addTagToTask(taskId, produto);
+            }
             
             return res.status(200).json([{
                 "task id": taskId,
                 "operacao": "nova task",
-                "tags_adicionadas": { acao, tag }
+                "tags_adicionadas": { acao, tag, produto }
             }]);
         }
 
