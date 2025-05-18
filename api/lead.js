@@ -6,6 +6,7 @@ const LIST_ID = '901305222206';
 const EMAIL_FIELD_ID = 'c34aaeb2-0233-42d3-8242-cd9a603b5b0b';
 const PHONE_FIELD_ID = '9c5b9ad9-b085-4fdd-a0a9-0110d341de7c';
 const VALUE_FIELD_ID = 'ae3dc146-154c-4287-b2aa-17e4f643cbf8';
+const WHATSAPP_LINK_FIELD_ID = '2b8641e9-5bda-4416-85a3-bd8f764794c0';
 const API_TOKEN = 'pk_18911835_PZA4YYUSR3JI37KV7CMEKNV62796SML1';
 
 // Função para obter timestamp atual em milissegundos
@@ -74,6 +75,13 @@ async function createTask(email, nome, phone, valor) {
             customFields.push({
                 id: PHONE_FIELD_ID,
                 value: phone
+            });
+
+            // Adiciona link do WhatsApp
+            const whatsappLink = `wa.me/${phone.replace('+', '')}`;
+            customFields.push({
+                id: WHATSAPP_LINK_FIELD_ID,
+                value: whatsappLink
             });
         }
 
