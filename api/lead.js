@@ -59,18 +59,18 @@ module.exports = async (req, res) => {
         const lead = await getLeadByEmail(email_lead.trim());
 
         if (lead) {
-            return res.status(200).json({
+            return res.status(200).json([{
                 "task id": lead.id,
                 "name": lead.name,
                 "email": email_lead,
                 "status": lead.status?.status,
                 "tags": lead.tags,
                 "custom_fields": lead.custom_fields
-            });
+            }]);
         } else {
-            return res.status(200).json({
+            return res.status(200).json([{
                 "task id": "não encontrado"
-            });
+            }]);
         }
 
     } catch (error) {
