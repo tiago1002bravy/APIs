@@ -155,7 +155,12 @@ async function getTaskTags(taskId) {
             { headers }
         );
 
-        return response.data.tags || [];
+        // Log para debug
+        console.log('Tags da task:', response.data.tags);
+        
+        // Garantir que retornamos um array de tags
+        const tags = response.data.tags || [];
+        return Array.isArray(tags) ? tags : [];
     } catch (error) {
         console.error('Erro ao obter tags da task:', error.response?.data || error.message);
         throw error;
@@ -166,8 +171,25 @@ async function getTaskTags(taskId) {
 async function taskHasProductTag(taskId, produto) {
     if (!produto) return true; // Se não houver produto especificado, considera que é compatível
     
-    const tags = await getTaskTags(taskId);
-    return tags.includes(produto);
+    try {
+        const tags = await getTaskTags(taskId);
+        
+        // Log para debug
+        console.log('Verificando produto:', produto);
+        console.log('Tags encontradas:', tags);
+        
+        // Verifica se alguma das tags é igual ao produto (case insensitive)
+        const temProduto = tags.some(tag => 
+            tag.toLowerCase() === produto.toLowerCase()
+        );
+        
+        console.log('Task tem o produto?', temProduto);
+        return temProduto;
+    } catch (error) {
+        console.error('Erro ao verificar tags da task:', error);
+        // Em caso de erro, retorna false para criar uma nova task
+        return false;
+    }
 }
 
 module.exports = async (req, res) => {
