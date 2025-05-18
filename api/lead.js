@@ -9,6 +9,7 @@ const VALUE_FIELD_ID = 'ae3dc146-154c-4287-b2aa-17e4f643cbf8';
 const WHATSAPP_LINK_FIELD_ID = '2b8641e9-5bda-4416-85a3-bd8f764794c0';
 const ACAO_FIELD_ID = '2b8641e9-5bda-4416-85a3-bd8f764794c1';
 const TAG_FIELD_ID = '2b8641e9-5bda-4416-85a3-bd8f764794c2';
+const LIQUIDADO_FIELD_ID = 'bcb43ba1-d0d9-4068-9943-41509bf24253';
 const API_TOKEN = 'pk_18911835_PZA4YYUSR3JI37KV7CMEKNV62796SML1';
 
 // Função para obter timestamp atual em milissegundos
@@ -57,7 +58,7 @@ async function getLeadByEmail(email) {
     }
 }
 
-async function createTask(email, nome, phone, valor, acao, tag) {
+async function createTask(email, nome, phone, valor, acao, tag, liquidado) {
     try {
         const headers = {
             'Authorization': API_TOKEN,
@@ -95,9 +96,18 @@ async function createTask(email, nome, phone, valor, acao, tag) {
             });
         }
 
+        // Adiciona campo liquidado se acao for comprador e liquidado for enviado
+        if (acao && typeof acao === 'string' && acao.trim().toLowerCase() === 'comprador' && liquidado !== undefined) {
+            customFields.push({
+                id: LIQUIDADO_FIELD_ID,
+                value: liquidado
+            });
+        }
+
         // TODO: Adicionar campos de ação e tag quando a integração com ClickUp estiver pronta
         console.log('Ação recebida:', acao);
         console.log('Tag recebida:', tag);
+        console.log('Liquidado recebido:', liquidado);
 
         const payload = {
             name: nome || `[Lead] ${email}`,
@@ -203,7 +213,7 @@ module.exports = async (req, res) => {
     }
 
     try {
-        const { email_lead, nome_lead, phone_lead, valor, acao, tag, produto } = req.body;
+        const { email_lead, nome_lead, phone_lead, valor, acao, tag, produto, liquidado } = req.body;
 
         // Validar email
         if (!email_lead || typeof email_lead !== 'string' || !email_lead.trim()) {
@@ -240,7 +250,7 @@ module.exports = async (req, res) => {
                 }
             } else {
                 // Criar nova task pois o produto é diferente
-                const newTask = await createTask(email, nome_lead, phone_lead, valor, acao, tag);
+                const newTask = await createTask(email, nome_lead, phone_lead, valor, acao, tag, liquidado);
                 taskId = newTask.id;
                 operacao = "nova task (produto diferente)";
                 
@@ -257,7 +267,7 @@ module.exports = async (req, res) => {
             }
         } else {
             // Criar nova task quando lead não for encontrado
-            const newTask = await createTask(email, nome_lead, phone_lead, valor, acao, tag);
+            const newTask = await createTask(email, nome_lead, phone_lead, valor, acao, tag, liquidado);
             taskId = newTask.id;
             operacao = "nova task";
             
