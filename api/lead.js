@@ -6,6 +6,18 @@ const LIST_ID = '901305222206';
 const EMAIL_FIELD_ID = 'c34aaeb2-0233-42d3-8242-cd9a603b5b0b';
 const API_TOKEN = 'pk_18911835_PZA4YYUSR3JI37KV7CMEKNV62796SML1';
 
+// Função para obter timestamp atual em milissegundos
+function getCurrentTimestamp() {
+    return Date.now();
+}
+
+// Função para obter timestamp de amanhã em milissegundos
+function getTomorrowTimestamp() {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return tomorrow.getTime();
+}
+
 async function getLeadByEmail(email) {
     try {
         const params = {
@@ -40,6 +52,41 @@ async function getLeadByEmail(email) {
     }
 }
 
+async function createTask(email) {
+    try {
+        const headers = {
+            'Authorization': API_TOKEN,
+            'accept': 'application/json',
+            'content-type': 'application/json'
+        };
+
+        const payload = {
+            name: `[Lead] ${email}`,
+            start_date: getCurrentTimestamp(),
+            time_estimate: getTomorrowTimestamp(),
+            start_date_time: true,
+            due_date_time: true,
+            custom_fields: [
+                {
+                    id: EMAIL_FIELD_ID,
+                    value: email
+                }
+            ]
+        };
+
+        const response = await axios.post(
+            `${CLICKUP_API_BASE_URL}/list/${LIST_ID}/task`,
+            payload,
+            { headers }
+        );
+
+        return response.data;
+    } catch (error) {
+        console.error('Erro ao criar task:', error.response?.data || error.message);
+        throw error;
+    }
+}
+
 module.exports = async (req, res) => {
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Método não permitido' });
@@ -55,21 +102,29 @@ module.exports = async (req, res) => {
             });
         }
 
+        const email = email_lead.trim();
+
         // Consultar lead no ClickUp
-        const lead = await getLeadByEmail(email_lead.trim());
+        const lead = await getLeadByEmail(email);
 
         if (lead) {
             return res.status(200).json([{
                 "task id": lead.id,
                 "name": lead.name,
-                "email": email_lead,
+                "email": email,
                 "status": lead.status?.status,
                 "tags": lead.tags,
                 "custom_fields": lead.custom_fields
             }]);
         } else {
+            // Criar nova task quando lead não for encontrado
+            const newTask = await createTask(email);
             return res.status(200).json([{
-                "task id": "não encontrado"
+                "task id": newTask.id,
+                "name": newTask.name,
+                "email": email,
+                "status": newTask.status?.status,
+                "custom_fields": newTask.custom_fields
             }]);
         }
 
