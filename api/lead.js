@@ -26,7 +26,7 @@ function getTomorrowTimestamp() {
 async function getLeadByEmail(email) {
     try {
         const params = {
-            include_closed: 'false',
+            include_closed: 'true',
             custom_fields: JSON.stringify([{
                 field_id: EMAIL_FIELD_ID,
                 operator: '=',
