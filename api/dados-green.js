@@ -116,7 +116,7 @@ module.exports = async (req, res) => {
         // 5. Extrair e converter acao
         let acaoFinal = null;
         if (isCheckoutAbandonedEvent) {
-            acaoFinal = "abandonada";
+            acaoFinal = "abandonado";
         } else {
             let statusOriginal = extractField(payload, statusSalePaths);
             if (statusOriginal === null) {
