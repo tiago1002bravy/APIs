@@ -73,7 +73,9 @@ module.exports = async (req, res) => {
         const statusSalePaths = [["sale", "status"]];
         const statusCurrentPaths = [["currentStatus"]];
         const statusOldPaths = [["oldStatus"]];
-        const valorPaths = [["sale", "amount"]];
+        const valorPaths = isCheckoutAbandonedEvent ? 
+            [["product", "amount"], ["offer", "amount"]] : 
+            [["sale", "amount"]];
         const sellerBalancePaths = [["sale", "seller_balance"]];
 
         // 1. Extrair nome
