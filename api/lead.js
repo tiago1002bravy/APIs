@@ -210,11 +210,19 @@ async function taskHasProductTag(taskId, produto) {
 // Função para atualizar o campo liquidado
 async function updateLiquidadoField(taskId, valorLiquidado) {
     try {
+        console.log('Atualizando campo liquidado:');
+        console.log('Task ID:', taskId);
+        console.log('Valor Liquidado:', valorLiquidado);
+        
         const headers = {
             'Authorization': API_TOKEN,
             'Content-Type': 'application/json',
             'Accept': 'application/json'
         };
+
+        console.log('Headers:', headers);
+        console.log('URL:', `${CLICKUP_API_BASE_URL}/task/${taskId}/field/${LIQUIDADO_FIELD_ID}`);
+        console.log('Body:', JSON.stringify({ value: String(valorLiquidado) }));
 
         const response = await axios.post(
             `${CLICKUP_API_BASE_URL}/task/${taskId}/field/${LIQUIDADO_FIELD_ID}`,
@@ -222,9 +230,13 @@ async function updateLiquidadoField(taskId, valorLiquidado) {
             { headers }
         );
 
+        console.log('Resposta da API:', response.data);
         return response.data;
     } catch (error) {
-        console.error('Erro ao atualizar campo liquidado:', error.response?.data || error.message);
+        console.error('Erro detalhado ao atualizar campo liquidado:');
+        console.error('Status:', error.response?.status);
+        console.error('Data:', error.response?.data);
+        console.error('Headers:', error.response?.headers);
         throw error;
     }
 }
@@ -249,77 +261,80 @@ module.exports = async (req, res) => {
         // Consultar lead no ClickUp
         const lead = await getLeadByEmail(email);
         let taskId;
-        let operacao;
+        let operacao = [];
 
         if (lead) {
-            // Verificar se a task existente tem a mesma tag de produto
             const temMesmoProduto = await taskHasProductTag(lead.id, produto);
             
             if (temMesmoProduto) {
-                // Atualizar task existente
+                operacao.push("task existente atualizada");
                 taskId = lead.id;
-                operacao = "task existente atualizada";
                 
                 // Adicionar novas tags à task existente
                 if (acao) {
                     await addTagToTask(taskId, acao);
+                    operacao.push("tag de ação adicionada");
                 }
                 if (tag) {
                     await addTagToTask(taskId, tag);
+                    operacao.push("tag adicionada");
                 }
                 if (produto) {
                     await addTagToTask(taskId, produto);
+                    operacao.push("tag de produto adicionada");
                 }
-                // Atualizar campo liquidado se for comprador
                 if (acao && typeof acao === 'string' && acao.trim().toLowerCase() === 'comprador' && liquidado !== undefined) {
                     await updateLiquidadoField(taskId, liquidado);
+                    operacao.push("campo liquidado atualizado");
                 }
             } else {
-                // Criar nova task pois o produto é diferente
+                operacao.push("nova task (produto diferente)");
                 const newTask = await createTask(email, nome_lead, phone_lead, valor, acao, tag, liquidado);
                 taskId = newTask.id;
-                operacao = "nova task (produto diferente)";
                 
-                // Adicionar tags à nova task
                 if (acao) {
                     await addTagToTask(taskId, acao);
+                    operacao.push("tag de ação adicionada");
                 }
                 if (tag) {
                     await addTagToTask(taskId, tag);
+                    operacao.push("tag adicionada");
                 }
                 if (produto) {
                     await addTagToTask(taskId, produto);
+                    operacao.push("tag de produto adicionada");
                 }
-                // Atualizar campo liquidado se for comprador
                 if (acao && typeof acao === 'string' && acao.trim().toLowerCase() === 'comprador' && liquidado !== undefined) {
                     await updateLiquidadoField(taskId, liquidado);
+                    operacao.push("campo liquidado atualizado");
                 }
             }
         } else {
-            // Criar nova task quando lead não for encontrado
+            operacao.push("nova task");
             const newTask = await createTask(email, nome_lead, phone_lead, valor, acao, tag, liquidado);
             taskId = newTask.id;
-            operacao = "nova task";
             
-            // Adicionar tags à nova task
             if (acao) {
                 await addTagToTask(taskId, acao);
+                operacao.push("tag de ação adicionada");
             }
             if (tag) {
                 await addTagToTask(taskId, tag);
+                operacao.push("tag adicionada");
             }
             if (produto) {
                 await addTagToTask(taskId, produto);
+                operacao.push("tag de produto adicionada");
             }
-            // Atualizar campo liquidado se for comprador
             if (acao && typeof acao === 'string' && acao.trim().toLowerCase() === 'comprador' && liquidado !== undefined) {
                 await updateLiquidadoField(taskId, liquidado);
+                operacao.push("campo liquidado atualizado");
             }
         }
 
         return res.status(200).json([{
             "task id": taskId,
-            "operacao": operacao,
+            "operacao": operacao.join(", "),
             "tags_adicionadas": { acao, tag, produto }
         }]);
 
