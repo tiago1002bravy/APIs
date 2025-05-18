@@ -11,9 +11,15 @@ const STATUS_TO_ACAO = {
 };
 
 const PRODUCT_NAME_TO_PRODUTO = {
-    "Produto A": "produto-a",
-    "Produto B": "produto-b",
-    // Adicione outros mapeamentos conforme necessário
+    "Mentoria Black": "mentoria-black",
+    "Implementação Bravy": "implementacao-bravy",
+    "Bravy Club": "bravy-club",
+    "Floow PRO": "floow-pro",
+    "Bravy Black": "bravy-black",
+    "ClickUp Pro": "clickup-pro",
+    "Club+Floow": "club+floow",
+    "ClickUp Start": "clickup-start",
+    "CRM Automatizado": "crm-automatizado"
 };
 
 // Função auxiliar para extrair campos do payload
@@ -97,7 +103,14 @@ module.exports = async (req, res) => {
         let produtoFinal = null;
         const produtoOriginalNome = extractField(payload, produtoOriginalPaths);
         if (typeof produtoOriginalNome === 'string') {
-            produtoFinal = PRODUCT_NAME_TO_PRODUTO[produtoOriginalNome];
+            produtoFinal = PRODUCT_NAME_TO_PRODUTO[produtoOriginalNome.trim()];
+            if (!produtoFinal) {
+                // Se não encontrar no mapeamento, usar o nome original formatado
+                produtoFinal = produtoOriginalNome.trim().toLowerCase()
+                    .replace(/\s+/g, '-')  // substitui espaços por hífen
+                    .normalize('NFD')      // normaliza para remover acentos
+                    .replace(/[\u0300-\u036f]/g, ''); // remove acentos
+            }
         }
 
         // 5. Extrair e converter acao
