@@ -142,6 +142,34 @@ async function addTagToTask(taskId, tagName) {
     }
 }
 
+// Função para obter as tags de uma task
+async function getTaskTags(taskId) {
+    try {
+        const headers = {
+            'Authorization': API_TOKEN,
+            'accept': 'application/json'
+        };
+
+        const response = await axios.get(
+            `${CLICKUP_API_BASE_URL}/task/${taskId}`,
+            { headers }
+        );
+
+        return response.data.tags || [];
+    } catch (error) {
+        console.error('Erro ao obter tags da task:', error.response?.data || error.message);
+        throw error;
+    }
+}
+
+// Função para verificar se a task tem a tag de produto específica
+async function taskHasProductTag(taskId, produto) {
+    if (!produto) return true; // Se não houver produto especificado, considera que é compatível
+    
+    const tags = await getTaskTags(taskId);
+    return tags.includes(produto);
+}
+
 module.exports = async (req, res) => {
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Método não permitido' });
@@ -162,28 +190,49 @@ module.exports = async (req, res) => {
         // Consultar lead no ClickUp
         const lead = await getLeadByEmail(email);
         let taskId;
+        let operacao;
 
         if (lead) {
-            taskId = lead.id;
-            // Adicionar tags à task existente
-            if (acao) {
-                await addTagToTask(taskId, acao);
+            // Verificar se a task existente tem a mesma tag de produto
+            const temMesmoProduto = await taskHasProductTag(lead.id, produto);
+            
+            if (temMesmoProduto) {
+                // Atualizar task existente
+                taskId = lead.id;
+                operacao = "task existente atualizada";
+                
+                // Adicionar novas tags à task existente
+                if (acao) {
+                    await addTagToTask(taskId, acao);
+                }
+                if (tag) {
+                    await addTagToTask(taskId, tag);
+                }
+                if (produto) {
+                    await addTagToTask(taskId, produto);
+                }
+            } else {
+                // Criar nova task pois o produto é diferente
+                const newTask = await createTask(email, nome_lead, phone_lead, valor, acao, tag);
+                taskId = newTask.id;
+                operacao = "nova task (produto diferente)";
+                
+                // Adicionar tags à nova task
+                if (acao) {
+                    await addTagToTask(taskId, acao);
+                }
+                if (tag) {
+                    await addTagToTask(taskId, tag);
+                }
+                if (produto) {
+                    await addTagToTask(taskId, produto);
+                }
             }
-            if (tag) {
-                await addTagToTask(taskId, tag);
-            }
-            if (produto) {
-                await addTagToTask(taskId, produto);
-            }
-            return res.status(200).json([{
-                "task id": taskId,
-                "operacao": "task existente",
-                "tags_adicionadas": { acao, tag, produto }
-            }]);
         } else {
             // Criar nova task quando lead não for encontrado
             const newTask = await createTask(email, nome_lead, phone_lead, valor, acao, tag);
             taskId = newTask.id;
+            operacao = "nova task";
             
             // Adicionar tags à nova task
             if (acao) {
@@ -195,13 +244,13 @@ module.exports = async (req, res) => {
             if (produto) {
                 await addTagToTask(taskId, produto);
             }
-            
-            return res.status(200).json([{
-                "task id": taskId,
-                "operacao": "nova task",
-                "tags_adicionadas": { acao, tag, produto }
-            }]);
         }
+
+        return res.status(200).json([{
+            "task id": taskId,
+            "operacao": operacao,
+            "tags_adicionadas": { acao, tag, produto }
+        }]);
 
     } catch (error) {
         console.error('Erro ao processar requisição:', error);
