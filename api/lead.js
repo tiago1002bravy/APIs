@@ -178,10 +178,15 @@ async function taskHasProductTag(taskId, produto) {
         console.log('Verificando produto:', produto);
         console.log('Tags encontradas:', tags);
         
-        // Verifica se alguma das tags é igual ao produto (case insensitive)
-        const temProduto = tags.some(tag => 
-            tag.toLowerCase() === produto.toLowerCase()
-        );
+        // Verifica se alguma das tags tem o campo name igual ao produto (case insensitive)
+        const temProduto = tags.some(tagObj => {
+            if (typeof tagObj === 'string') {
+                return tagObj.toLowerCase() === produto.toLowerCase();
+            } else if (tagObj && tagObj.name) {
+                return tagObj.name.toLowerCase() === produto.toLowerCase();
+            }
+            return false;
+        });
         
         console.log('Task tem o produto?', temProduto);
         return temProduto;
