@@ -207,6 +207,28 @@ async function taskHasProductTag(taskId, produto) {
     }
 }
 
+// Função para atualizar o campo liquidado
+async function updateLiquidadoField(taskId, valorLiquidado) {
+    try {
+        const headers = {
+            'Authorization': API_TOKEN,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        };
+
+        const response = await axios.post(
+            `${CLICKUP_API_BASE_URL}/task/${taskId}/field/${LIQUIDADO_FIELD_ID}`,
+            { value: String(valorLiquidado) },
+            { headers }
+        );
+
+        return response.data;
+    } catch (error) {
+        console.error('Erro ao atualizar campo liquidado:', error.response?.data || error.message);
+        throw error;
+    }
+}
+
 module.exports = async (req, res) => {
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Método não permitido' });
@@ -248,6 +270,10 @@ module.exports = async (req, res) => {
                 if (produto) {
                     await addTagToTask(taskId, produto);
                 }
+                // Atualizar campo liquidado se for comprador
+                if (acao && typeof acao === 'string' && acao.trim().toLowerCase() === 'comprador' && liquidado !== undefined) {
+                    await updateLiquidadoField(taskId, liquidado);
+                }
             } else {
                 // Criar nova task pois o produto é diferente
                 const newTask = await createTask(email, nome_lead, phone_lead, valor, acao, tag, liquidado);
@@ -263,6 +289,10 @@ module.exports = async (req, res) => {
                 }
                 if (produto) {
                     await addTagToTask(taskId, produto);
+                }
+                // Atualizar campo liquidado se for comprador
+                if (acao && typeof acao === 'string' && acao.trim().toLowerCase() === 'comprador' && liquidado !== undefined) {
+                    await updateLiquidadoField(taskId, liquidado);
                 }
             }
         } else {
@@ -280,6 +310,10 @@ module.exports = async (req, res) => {
             }
             if (produto) {
                 await addTagToTask(taskId, produto);
+            }
+            // Atualizar campo liquidado se for comprador
+            if (acao && typeof acao === 'string' && acao.trim().toLowerCase() === 'comprador' && liquidado !== undefined) {
+                await updateLiquidadoField(taskId, liquidado);
             }
         }
 
