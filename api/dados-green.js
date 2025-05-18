@@ -4,7 +4,7 @@ const express = require('express');
 const STATUS_TO_ACAO = {
     "created": "lead",
     "paid": "comprador",
-    "waiting_payment": "abandonado",
+    "waiting_payment": "pixgerado",
     "refused": "recusado",
     "refunded": "reembolsado",
     "chargedback": "chargeback"
