@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard NPS - Bravy</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .card {
+            @apply bg-white rounded-lg shadow-lg p-6 transition-all duration-300 hover:shadow-xl;
+        }
+        .metric-value {
+            @apply text-4xl font-bold text-gray-800;
+        }
+        .metric-label {
+            @apply text-sm text-gray-600 mt-2;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <h1 class="text-3xl font-bold text-gray-800 mb-8">Dashboard NPS</h1>
+        
+        <!-- Grid de métricas -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+            <!-- Total -->
+            <div class="card">
+                <div class="metric-value" id="total">-</div>
+                <div class="metric-label">NPS Totais</div>
+            </div>
+            
+            <!-- Enviados -->
+            <div class="card">
+                <div class="metric-value" id="enviados">-</div>
+                <div class="metric-label">NPS Enviados</div>
+            </div>
+            
+            <!-- Respondidos -->
+            <div class="card">
+                <div class="metric-value" id="respondidos">-</div>
+                <div class="metric-label">NPS Respondidos</div>
+            </div>
+            
+            <!-- Detratores -->
+            <div class="card">
+                <div class="metric-value text-red-600" id="detratores">-</div>
+                <div class="metric-label">Detratores</div>
+            </div>
+            
+            <!-- Neutros -->
+            <div class="card">
+                <div class="metric-value text-yellow-600" id="neutros">-</div>
+                <div class="metric-label">Neutros</div>
+            </div>
+            
+            <!-- Promotores -->
+            <div class="card">
+                <div class="metric-value text-green-600" id="promotores">-</div>
+                <div class="metric-label">Promotores</div>
+            </div>
+        </div>
+
+        <!-- Gráfico -->
+        <div class="card">
+            <canvas id="npsChart"></canvas>
+        </div>
+    </div>
+
+    <script>
+        // Função para atualizar os valores
+        async function updateMetrics() {
+            try {
+                const response = await fetch('/api/nps-dashboard');
+                const data = await response.json();
+
+                // Atualizar métricas
+                document.getElementById('total').textContent = data.total;
+                document.getElementById('enviados').textContent = data.enviados;
+                document.getElementById('respondidos').textContent = data.respondidos;
+                document.getElementById('detratores').textContent = data.detratores;
+                document.getElementById('neutros').textContent = data.neutros;
+                document.getElementById('promotores').textContent = data.promotores;
+
+                // Atualizar gráfico
+                updateChart(data);
+            } catch (error) {
+                console.error('Erro ao buscar dados:', error);
+            }
+        }
+
+        // Configuração do gráfico
+        const ctx = document.getElementById('npsChart').getContext('2d');
+        let npsChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['Detratores', 'Neutros', 'Promotores'],
+                datasets: [{
+                    label: 'Distribuição NPS',
+                    data: [0, 0, 0],
+                    backgroundColor: [
+                        'rgba(239, 68, 68, 0.8)',  // Vermelho para detratores
+                        'rgba(234, 179, 8, 0.8)',  // Amarelo para neutros
+                        'rgba(34, 197, 94, 0.8)'   // Verde para promotores
+                    ],
+                    borderColor: [
+                        'rgb(239, 68, 68)',
+                        'rgb(234, 179, 8)',
+                        'rgb(34, 197, 94)'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    title: {
+                        display: true,
+                        text: 'Distribuição de NPS',
+                        font: {
+                            size: 16
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            stepSize: 1
+                        }
+                    }
+                }
+            }
+        });
+
+        // Função para atualizar o gráfico
+        function updateChart(data) {
+            npsChart.data.datasets[0].data = [
+                data.detratores,
+                data.neutros,
+                data.promotores
+            ];
+            npsChart.update();
+        }
+
+        // Atualizar dados a cada 5 minutos
+        updateMetrics();
+        setInterval(updateMetrics, 5 * 60 * 1000);
+    </script>
+</body>
+</html> 

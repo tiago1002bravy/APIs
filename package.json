@@ -1,17 +1,24 @@
 {
-  "name": "apis-bravy",
+  "name": "bravy-apis",
   "version": "1.0.0",
-  "description": "APIs da Bravy",
-  "main": "index.js",
+  "private": true,
   "scripts": {
-    "dev": "vercel dev",
-    "deploy": "vercel deploy --prod"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
   },
   "dependencies": {
     "axios": "^1.6.7",
-    "express": "^4.18.2"
+    "chart.js": "^4.4.1",
+    "next": "^14.1.0",
+    "react": "^18.2.0",
+    "react-chartjs-2": "^5.2.0",
+    "react-dom": "^18.2.0"
   },
   "devDependencies": {
-    "vercel": "^33.5.1"
+    "autoprefixer": "^10.4.17",
+    "postcss": "^8.4.35",
+    "tailwindcss": "^3.4.1"
   }
 }
