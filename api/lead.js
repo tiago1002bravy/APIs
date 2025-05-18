@@ -63,9 +63,9 @@ async function createTask(email) {
         const payload = {
             name: `[Lead] ${email}`,
             start_date: getCurrentTimestamp(),
-            time_estimate: getTomorrowTimestamp(),
             start_date_time: true,
             due_date_time: true,
+            due_date: getTomorrowTimestamp(),
             custom_fields: [
                 {
                     id: EMAIL_FIELD_ID,
