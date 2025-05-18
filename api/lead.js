@@ -4,6 +4,8 @@ const axios = require('axios');
 const CLICKUP_API_BASE_URL = 'https://api.clickup.com/api/v2';
 const LIST_ID = '901305222206';
 const EMAIL_FIELD_ID = 'c34aaeb2-0233-42d3-8242-cd9a603b5b0b';
+const PHONE_FIELD_ID = '9c5b9ad9-b085-4fdd-a0a9-0110d341de7c';
+const VALUE_FIELD_ID = 'ae3dc146-154c-4287-b2aa-17e4f643cbf8';
 const API_TOKEN = 'pk_18911835_PZA4YYUSR3JI37KV7CMEKNV62796SML1';
 
 // Função para obter timestamp atual em milissegundos
@@ -52,7 +54,7 @@ async function getLeadByEmail(email) {
     }
 }
 
-async function createTask(email) {
+async function createTask(email, nome, phone, valor) {
     try {
         const headers = {
             'Authorization': API_TOKEN,
@@ -60,18 +62,36 @@ async function createTask(email) {
             'content-type': 'application/json'
         };
 
+        const customFields = [
+            {
+                id: EMAIL_FIELD_ID,
+                value: email
+            }
+        ];
+
+        // Adiciona telefone se fornecido
+        if (phone) {
+            customFields.push({
+                id: PHONE_FIELD_ID,
+                value: phone
+            });
+        }
+
+        // Adiciona valor se fornecido
+        if (valor) {
+            customFields.push({
+                id: VALUE_FIELD_ID,
+                value: parseFloat(valor)
+            });
+        }
+
         const payload = {
-            name: `[Lead] ${email}`,
+            name: nome || `[Lead] ${email}`,
             start_date: getCurrentTimestamp(),
             start_date_time: true,
             due_date_time: true,
             due_date: getTomorrowTimestamp(),
-            custom_fields: [
-                {
-                    id: EMAIL_FIELD_ID,
-                    value: email
-                }
-            ]
+            custom_fields: customFields
         };
 
         const response = await axios.post(
@@ -93,7 +113,7 @@ module.exports = async (req, res) => {
     }
 
     try {
-        const { email_lead } = req.body;
+        const { email_lead, nome_lead, phone_lead, valor } = req.body;
 
         // Validar email
         if (!email_lead || typeof email_lead !== 'string' || !email_lead.trim()) {
@@ -118,7 +138,7 @@ module.exports = async (req, res) => {
             }]);
         } else {
             // Criar nova task quando lead não for encontrado
-            const newTask = await createTask(email);
+            const newTask = await createTask(email, nome_lead, phone_lead, valor);
             return res.status(200).json([{
                 "task id": newTask.id,
                 "name": newTask.name,
