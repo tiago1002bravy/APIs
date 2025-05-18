@@ -45,4 +45,8 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+export async function GET() {
+  return NextResponse.json({ message: "API ativa! Use POST para consultar o dia da semana." });
 } 
