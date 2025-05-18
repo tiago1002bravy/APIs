@@ -3,7 +3,7 @@ Rotas para processamento de webhooks.
 """
 from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import JSONResponse
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
 
 from ..core.config import STATUS_TO_ACAO, PRODUCT_NAME_TO_PRODUTO
 from ..utils.extractors import extract_field
@@ -13,9 +13,14 @@ router = APIRouter(prefix="/api")
 @router.post("/dados-green", tags=["webhook"])
 async def process_webhook(request: Request):
     try:
-        payload: Dict[str, Any] = await request.json()
+        payload_list: List[Dict[str, Any]] = await request.json()
+        if not isinstance(payload_list, list) or not payload_list:
+            raise HTTPException(status_code=400, detail="Invalid JSON payload: must be a non-empty array.")
+        
+        # Pegar o primeiro item do array e extrair o body
+        payload = payload_list[0].get("body", {})
         if not isinstance(payload, dict):
-            raise HTTPException(status_code=400, detail="Invalid JSON payload: root must be an object.")
+            raise HTTPException(status_code=400, detail="Invalid JSON payload: body must be an object.")
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid or malformed JSON payload")
 
@@ -66,7 +71,16 @@ async def process_webhook(request: Request):
     produto_original_nome = extract_field(payload, produto_original_paths)
     produto_final: Optional[str] = None
     if isinstance(produto_original_nome, str):
-        produto_final = PRODUCT_NAME_TO_PRODUTO.get(produto_original_nome)
+        produto_final = PRODUCT_NAME_TO_PRODUTO.get(produto_original_nome.strip())
+        if produto_final is None:
+            # Se não encontrar no mapeamento, usar o nome original formatado
+            produto_final = produto_original_nome.strip().lower()
+            # Substituir espaços por hífens e remover acentos
+            produto_final = produto_final.replace(" ", "-")
+            # Remover acentos
+            import unicodedata
+            produto_final = ''.join(c for c in unicodedata.normalize('NFD', produto_final)
+                                  if unicodedata.category(c) != 'Mn')
 
     # 5. Extrair e converter acao
     acao_final: Optional[str] = None
