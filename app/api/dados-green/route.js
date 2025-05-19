@@ -47,6 +47,8 @@ export async function POST(req) {
         // Se for um array com campo body, extrai o body
         if (Array.isArray(payload) && payload.length > 0 && payload[0].body) {
             payload = payload[0].body;
+        } else if (payload.body && typeof payload.body === 'object') {
+            payload = payload.body;
         }
         if (!payload || typeof payload !== 'object') {
             return NextResponse.json({ error: 'Payload JSON inválido: deve ser um objeto' }, { status: 400 });
