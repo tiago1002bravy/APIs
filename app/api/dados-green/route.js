@@ -99,6 +99,9 @@ export async function POST(req) {
             return NextResponse.json({ error: 'Tipo de webhook não suportado' }, { status: 400 });
         }
 
+        // Debug: log do email extraído
+        console.log('Email extraído:', emailFinal);
+
         const outputData = {
             nome: nomeFinal,
             email: emailFinal,
