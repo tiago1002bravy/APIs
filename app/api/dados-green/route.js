@@ -1,4 +1,4 @@
-const express = require('express');
+import { NextResponse } from "next/server";
 
 // Mapeamentos de status e produtos
 const STATUS_TO_ACAO = {
@@ -41,15 +41,11 @@ function extractField(payload, paths) {
     return null;
 }
 
-module.exports = async (req, res) => {
-    if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Método não permitido' });
-    }
-
+export async function POST(req) {
     try {
-        const payload = req.body;
+        const payload = await req.json();
         if (!payload || typeof payload !== 'object') {
-            return res.status(400).json({ error: 'Payload JSON inválido: deve ser um objeto' });
+            return NextResponse.json({ error: 'Payload JSON inválido: deve ser um objeto' }, { status: 400 });
         }
 
         const payloadType = payload.type;
@@ -183,10 +179,10 @@ module.exports = async (req, res) => {
             liquidado: liquidadoFinal
         };
 
-        return res.status(200).json([outputData]);
+        return NextResponse.json([outputData]);
 
     } catch (error) {
         console.error('Erro ao processar webhook:', error);
-        return res.status(500).json({ error: 'Erro interno do servidor' });
+        return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
     }
-}; 
+} 

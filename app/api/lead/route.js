@@ -1,4 +1,5 @@
-const axios = require('axios');
+import axios from "axios";
+import { NextResponse } from "next/server";
 
 // Constantes para a API do ClickUp
 const CLICKUP_API_BASE_URL = 'https://api.clickup.com/api/v2';
@@ -241,19 +242,16 @@ async function updateLiquidadoField(taskId, valorLiquidado) {
     }
 }
 
-module.exports = async (req, res) => {
-    if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Método não permitido' });
-    }
-
+export async function POST(req) {
     try {
-        const { email_lead, nome_lead, phone_lead, valor, acao, tag, produto, liquidado } = req.body;
+        const body = await req.json();
+        const { email_lead, nome_lead, phone_lead, valor, acao, tag, produto, liquidado } = body;
 
         // Validar email
         if (!email_lead || typeof email_lead !== 'string' || !email_lead.trim()) {
-            return res.status(400).json({ 
+            return NextResponse.json({ 
                 error: 'Email do lead é obrigatório e deve ser uma string válida' 
-            });
+            }, { status: 400 });
         }
 
         const email = email_lead.trim();
@@ -332,7 +330,7 @@ module.exports = async (req, res) => {
             }
         }
 
-        return res.status(200).json([{
+        return NextResponse.json([{
             "task id": taskId,
             "operacao": operacao.join(", "),
             "tags_adicionadas": { acao, tag, produto }
@@ -344,19 +342,19 @@ module.exports = async (req, res) => {
         // Tratar erros específicos do ClickUp
         if (error.response) {
             if (error.response.status === 401) {
-                return res.status(401).json({ 
+                return NextResponse.json({ 
                     error: 'Token de autorização inválido ou expirado' 
-                });
+                }, { status: 401 });
             }
             if (error.response.status === 404) {
-                return res.status(404).json({ 
+                return NextResponse.json({ 
                     error: 'Lista ou task não encontrada no ClickUp' 
-                });
+                }, { status: 404 });
             }
         }
 
-        return res.status(500).json({ 
+        return NextResponse.json({ 
             error: 'Erro interno do servidor ao consultar o ClickUp' 
-        });
+        }, { status: 500 });
     }
-}; 
+} 
