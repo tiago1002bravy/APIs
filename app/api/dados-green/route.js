@@ -43,128 +43,58 @@ function extractField(payload, paths) {
 
 export async function POST(req) {
     try {
-        const payload = await req.json();
+        let payload = await req.json();
+        // Se for um array com campo body, extrai o body
+        if (Array.isArray(payload) && payload.length > 0 && payload[0].body) {
+            payload = payload[0].body;
+        }
         if (!payload || typeof payload !== 'object') {
             return NextResponse.json({ error: 'Payload JSON inválido: deve ser um objeto' }, { status: 400 });
         }
 
-        const payloadType = payload.type;
-        const payloadEvent = payload.event;
-        const isCheckoutAbandonedEvent = (payloadType === "lead" && payloadEvent === "checkoutAbandoned");
+        // Detectar tipo do webhook
+        const type = payload.type;
+        const event = payload.event;
+        let nomeFinal = null, emailFinal = null, telefoneFinal = null, produtoFinal = null, valorFinal = null, acaoFinal = null, tagFinal = null, idprodutoFinal = null, liquidadoFinal = null;
 
-        // Definir caminhos de extração com base no tipo de evento
-        const nomePaths = isCheckoutAbandonedEvent ? 
-            [["lead", "name"]] : 
-            [["client", "name"]];
-        
-        const emailPaths = isCheckoutAbandonedEvent ? 
-            [["lead", "email"]] : 
-            [["client", "email"]];
-        
-        const telefonePaths = isCheckoutAbandonedEvent ? 
-            [["lead", "cellphone"]] : 
-            [["client", "cellphone"]];
-
-        const produtoOriginalPaths = [["product", "name"]];
-        const statusSalePaths = [["sale", "status"]];
-        const statusCurrentPaths = [["currentStatus"]];
-        const statusOldPaths = [["oldStatus"]];
-        const valorPaths = isCheckoutAbandonedEvent ? 
-            [["product", "amount"], ["offer", "amount"]] : 
-            [["sale", "amount"]];
-        const sellerBalancePaths = [["sale", "seller_balance"]];
-
-        // 1. Extrair nome
-        let nomeFinal = null;
-        const rawNome = extractField(payload, nomePaths);
-        if (typeof rawNome === 'string' && rawNome.trim()) {
-            nomeFinal = rawNome.trim();
-        }
-
-        // 2. Extrair email
-        let emailFinal = null;
-        const rawEmail = extractField(payload, emailPaths);
-        if (typeof rawEmail === 'string' && rawEmail.trim()) {
-            emailFinal = rawEmail.trim();
-        }
-
-        // 3. Extrair telefone
-        let telefoneFinal = null;
-        const rawTelefone = extractField(payload, telefonePaths);
-        if (typeof rawTelefone === 'string' && rawTelefone.trim()) {
-            telefoneFinal = rawTelefone.trim();
-        } else if (typeof rawTelefone === 'number') {
-            telefoneFinal = String(rawTelefone);
-        }
-
-        // 4. Extrair e converter produto
-        let produtoFinal = null;
-        const produtoOriginalNome = extractField(payload, produtoOriginalPaths);
-        if (typeof produtoOriginalNome === 'string') {
-            produtoFinal = PRODUCT_NAME_TO_PRODUTO[produtoOriginalNome.trim()];
-            if (!produtoFinal) {
-                // Se não encontrar no mapeamento, usar o nome original formatado
-                produtoFinal = produtoOriginalNome.trim().toLowerCase()
-                    .replace(/\s+/g, '-')  // substitui espaços por hífen
-                    .normalize('NFD')      // normaliza para remover acentos
-                    .replace(/[\u0300-\u036f]/g, ''); // remove acentos
+        if (type === 'sale') {
+            // Webhook de venda
+            nomeFinal = payload.client?.name || null;
+            emailFinal = payload.client?.email || null;
+            telefoneFinal = payload.client?.cellphone || null;
+            produtoFinal = PRODUCT_NAME_TO_PRODUTO[payload.product?.name?.trim()] || (payload.product?.name?.trim()?.toLowerCase().replace(/\s+/g, '-').normalize('NFD').replace(/[\u0300-\u036f]/g, '')) || null;
+            valorFinal = payload.sale?.amount || null;
+            acaoFinal = STATUS_TO_ACAO[payload.sale?.status?.toLowerCase()] || null;
+            tagFinal = (acaoFinal && produtoFinal) ? `${acaoFinal}-${produtoFinal}` : null;
+            idprodutoFinal = tagFinal;
+            if (acaoFinal === 'comprador') {
+                liquidadoFinal = payload.sale?.seller_balance || null;
             }
-        }
-
-        // 5. Extrair e converter acao
-        let acaoFinal = null;
-        if (isCheckoutAbandonedEvent) {
-            acaoFinal = "abandonado";
+        } else if (type === 'contract') {
+            // Webhook de contrato
+            nomeFinal = payload.client?.name || null;
+            emailFinal = payload.client?.email || null;
+            telefoneFinal = payload.client?.cellphone || null;
+            produtoFinal = PRODUCT_NAME_TO_PRODUTO[payload.product?.name?.trim()] || (payload.product?.name?.trim()?.toLowerCase().replace(/\s+/g, '-').normalize('NFD').replace(/[\u0300-\u036f]/g, '')) || null;
+            valorFinal = payload.currentSale?.amount || null;
+            acaoFinal = STATUS_TO_ACAO[payload.currentSale?.status?.toLowerCase()] || null;
+            tagFinal = (acaoFinal && produtoFinal) ? `${acaoFinal}-${produtoFinal}` : null;
+            idprodutoFinal = tagFinal;
+            if (acaoFinal === 'comprador') {
+                liquidadoFinal = payload.currentSale?.seller_balance || null;
+            }
+        } else if (type === 'lead' && event === 'checkoutAbandoned') {
+            // Webhook de abandono de carrinho
+            nomeFinal = payload.lead?.name || null;
+            emailFinal = payload.lead?.email || null;
+            telefoneFinal = payload.lead?.cellphone || null;
+            produtoFinal = PRODUCT_NAME_TO_PRODUTO[payload.product?.name?.trim()] || (payload.product?.name?.trim()?.toLowerCase().replace(/\s+/g, '-').normalize('NFD').replace(/[\u0300-\u036f]/g, '')) || null;
+            valorFinal = payload.product?.amount || null;
+            acaoFinal = 'abandonado';
+            tagFinal = (acaoFinal && produtoFinal) ? `${acaoFinal}-${produtoFinal}` : null;
+            idprodutoFinal = tagFinal;
         } else {
-            let statusOriginal = extractField(payload, statusSalePaths);
-            if (statusOriginal === null) {
-                statusOriginal = extractField(payload, statusCurrentPaths);
-            }
-            if (statusOriginal === null) {
-                statusOriginal = extractField(payload, statusOldPaths);
-            }
-            
-            if (typeof statusOriginal === 'string') {
-                acaoFinal = STATUS_TO_ACAO[statusOriginal.toLowerCase()];
-            }
-        }
-
-        // 6. Criar tag
-        const tagFinal = (acaoFinal && produtoFinal) ? 
-            `${acaoFinal}-${produtoFinal}` : 
-            null;
-
-        // 7. Criar idproduto (igual a tag)
-        const idprodutoFinal = tagFinal;
-
-        // 8. Extrair valor
-        let valorFinal = null;
-        const rawValor = extractField(payload, valorPaths);
-        if (typeof rawValor === 'number') {
-            valorFinal = Math.floor(rawValor);
-        } else if (typeof rawValor === 'string') {
-            try {
-                const cleanedValorStr = rawValor.replace(',', '.');
-                valorFinal = Math.floor(parseFloat(cleanedValorStr));
-            } catch (e) {
-                valorFinal = null;
-            }
-        }
-
-        // 9. Extrair valor liquidado
-        let liquidadoFinal = null;
-        if (acaoFinal === "comprador") {
-            const rawLiquidado = extractField(payload, sellerBalancePaths);
-            if (typeof rawLiquidado === 'number') {
-                liquidadoFinal = parseFloat(rawLiquidado);
-            } else if (typeof rawLiquidado === 'string') {
-                try {
-                    const cleanedLiquidadoStr = rawLiquidado.replace(',', '.');
-                    liquidadoFinal = parseFloat(cleanedLiquidadoStr);
-                } catch (e) {
-                    liquidadoFinal = null;
-                }
-            }
+            return NextResponse.json({ error: 'Tipo de webhook não suportado' }, { status: 400 });
         }
 
         const outputData = {
@@ -180,7 +110,6 @@ export async function POST(req) {
         };
 
         return NextResponse.json([outputData]);
-
     } catch (error) {
         console.error('Erro ao processar webhook:', error);
         return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
