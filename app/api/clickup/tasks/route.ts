@@ -81,22 +81,40 @@ async function getTasksByAssignee(assigneeId: number): Promise<ClickUpTask[]> {
 
 // Função para extrair os dados do custom field de agenda
 function extractAgendaClientes(customFields: Array<{id: string, value: any}>): AgendaCliente[] {
-    const agendaField = customFields.find(field => 
-        field.id === '0218d951-f901-42f6-949c-a40e17eb77e1' || 
-        field.value?.type_config?.field_inverted_name === '04. Agenda cliente ok'
-    );
+    console.log('Custom Fields recebidos:', JSON.stringify(customFields, null, 2));
+    
+    // Procurar pelo custom field de agenda
+    const agendaField = customFields.find(field => {
+        console.log('Verificando field:', field.id, field.value?.type_config?.field_inverted_name);
+        return field.value?.type_config?.field_inverted_name === '04. Agenda cliente ok';
+    });
 
-    if (!agendaField || !agendaField.value?.value) {
+    console.log('Agenda field encontrado:', agendaField);
+
+    if (!agendaField?.value?.value) {
+        console.log('Nenhum valor encontrado no campo de agenda');
         return [];
     }
 
-    return agendaField.value.value.map((item: any) => ({
-        id: item.id,
-        name: item.name,
-        status: item.status,
-        color: item.color,
-        url: item.url
-    }));
+    // Verificar se o valor é um array
+    if (!Array.isArray(agendaField.value.value)) {
+        console.log('Valor não é um array:', agendaField.value.value);
+        return [];
+    }
+
+    const agendaItems = agendaField.value.value.map((item: any) => {
+        console.log('Processando item da agenda:', item);
+        return {
+            id: item.id,
+            name: item.name,
+            status: item.status,
+            color: item.color,
+            url: item.url
+        };
+    });
+
+    console.log('Itens da agenda processados:', agendaItems);
+    return agendaItems;
 }
 
 // Função para processar a requisição
@@ -117,13 +135,20 @@ async function processRequest(request: Request) {
         }
 
         const tasks = await getTasksByAssignee(parseInt(assigneeId));
+        console.log('Tarefas brutas recebidas:', JSON.stringify(tasks[0], null, 2)); // Log da primeira tarefa para debug
         
         // Filtrar e transformar as tarefas
-        const filteredTasks: FilteredTask[] = tasks.map(task => ({
-            id: task.id,
-            name: task.name,
-            agenda_clientes: extractAgendaClientes(task.custom_fields)
-        }));
+        const filteredTasks: FilteredTask[] = tasks.map(task => {
+            console.log('Processando tarefa:', task.id, task.name);
+            const agendaItems = extractAgendaClientes(task.custom_fields);
+            console.log('Itens da agenda para tarefa', task.id, ':', agendaItems);
+            
+            return {
+                id: task.id,
+                name: task.name,
+                agenda_clientes: agendaItems
+            };
+        });
 
         console.log(`[${new Date().toISOString()}] Consulta de tarefas executada para assignee ${assigneeId}. Total de tarefas: ${tasks.length}`);
 
