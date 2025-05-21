@@ -96,15 +96,13 @@ export async function GET() {
     }
 }
 
+// Configuração da rota
 export const runtime = "edge";
 export const preferredRegion = ["gru1"];
 
 // Configuração do cron job
-export const config = {
-    runtime: 'edge',
-    regions: ['gru1'], // Região de São Paulo para garantir UTC-3
-    cron: '0 8 * * *' // Executa todos os dias às 8h da manhã (UTC-3)
-};
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export async function POST() {
     try {
