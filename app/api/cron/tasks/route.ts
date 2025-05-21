@@ -98,6 +98,7 @@ export async function GET() {
 
 export const runtime = "edge";
 export const preferredRegion = ["gru1"];
+export const cron = '0 8 * * *';
 
 // Configuração do cron job
 export const config = {
