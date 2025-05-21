@@ -61,8 +61,11 @@ async function getTasksByAssignee(assigneeId: number): Promise<ClickUpTask[]> {
             page: 0,
             limit: 100,
             statuses: ALLOWED_STATUSES,
-            assignees: [assigneeId]
+            assignees: [assigneeId],
+            custom_fields: '["0218d951-f901-42f6-949c-a40e17eb77e1"]' // Adicionando o ID do custom field específico
         };
+
+        console.log('Fazendo requisição para ClickUp com params:', params);
 
         const response = await axios.get<ClickUpResponse>(
             `${CLICKUP_API_BASE_URL}/list/${LIST_ID}/task`,
@@ -72,27 +75,47 @@ async function getTasksByAssignee(assigneeId: number): Promise<ClickUpTask[]> {
             }
         );
 
+        // Log detalhado da primeira tarefa para debug
+        if (response.data.tasks.length > 0) {
+            console.log('Exemplo de tarefa do ClickUp:', JSON.stringify(response.data.tasks[0], null, 2));
+            console.log('Custom fields da primeira tarefa:', JSON.stringify(response.data.tasks[0].custom_fields, null, 2));
+        }
+
         return response.data.tasks;
     } catch (error) {
-        console.error('Erro ao buscar tarefas:', error instanceof Error ? error.message : 'Erro desconhecido');
+        console.error('Erro detalhado ao buscar tarefas:', error instanceof Error ? error.message : 'Erro desconhecido');
+        if (axios.isAxiosError(error)) {
+            console.error('Resposta do ClickUp:', error.response?.data);
+        }
         throw error;
     }
 }
 
 // Função para extrair os dados do custom field de agenda
 function extractAgendaClientes(customFields: Array<{id: string, value: any}>): AgendaCliente[] {
+    console.log('=== Extraindo dados do custom field de agenda ===');
     console.log('Custom Fields recebidos:', JSON.stringify(customFields, null, 2));
     
     // Procurar pelo custom field de agenda
     const agendaField = customFields.find(field => {
-        console.log('Verificando field:', field.id, field.value?.type_config?.field_inverted_name);
-        return field.value?.type_config?.field_inverted_name === '04. Agenda cliente ok';
+        const fieldName = field.value?.type_config?.field_inverted_name;
+        console.log('Verificando field:', {
+            id: field.id,
+            name: fieldName,
+            value: field.value
+        });
+        return fieldName === '04. Agenda cliente ok';
     });
 
-    console.log('Agenda field encontrado:', agendaField);
+    if (!agendaField) {
+        console.log('Campo de agenda não encontrado nos custom fields');
+        return [];
+    }
 
-    if (!agendaField?.value?.value) {
-        console.log('Nenhum valor encontrado no campo de agenda');
+    console.log('Agenda field encontrado:', JSON.stringify(agendaField, null, 2));
+
+    if (!agendaField.value?.value) {
+        console.log('Valor do campo de agenda está vazio');
         return [];
     }
 
