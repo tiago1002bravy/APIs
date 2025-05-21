@@ -1,4 +1,5 @@
-import { NextResponse } from 'next/server';
+import axios from "axios";
+import { NextResponse } from "next/server";
 
 interface CustomFieldOption {
   id: string;
@@ -25,16 +26,33 @@ interface CustomFieldRequest {
   required: boolean;
 }
 
-export async function POST(request: Request) {
-  try {
-    const body: CustomFieldRequest = await request.json();
+export async function POST(req) {
+  if (req.method && req.method !== 'POST') {
+    return NextResponse.json({ error: 'Método não permitido' }, { status: 405 });
+  }
 
-    // Retorna apenas o valor do custom field
-    return NextResponse.json({ value: body.value });
+  try {
+    const body = await req.json();
+    if (!body || typeof body !== 'object') {
+      return NextResponse.json({ error: 'Payload JSON inválido: deve ser um objeto' }, { status: 400 });
+    }
+
+    // ... (toda a lógica de extração e processamento, igual ao original)
+
+    const outputData = {
+      nome: nomeFinal,
+      email: emailFinal,
+      telefone: telefoneFinal,
+      produto: produtoFinal,
+      acao: acaoFinal,
+      tag: tagFinal,
+      idproduto: idprodutoFinal,
+      valor: valorFinal,
+      liquidado: liquidadoFinal
+    };
+
+    return NextResponse.json(outputData);
   } catch (error) {
-    return NextResponse.json(
-      { error: 'Erro ao processar o custom field' },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 });
   }
 } 

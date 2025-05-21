@@ -13,14 +13,14 @@ router = APIRouter(prefix="/api")
 @router.post("/dados-green", tags=["webhook"])
 async def process_webhook(request: Request):
     try:
-        payload_list: List[Dict[str, Any]] = await request.json()
-        if not isinstance(payload_list, list) or not payload_list:
-            raise HTTPException(status_code=400, detail="Invalid JSON payload: must be a non-empty array.")
-        
-        # Pegar o primeiro item do array e extrair o body
-        payload = payload_list[0].get("body", {})
-        if not isinstance(payload, dict):
-            raise HTTPException(status_code=400, detail="Invalid JSON payload: body must be an object.")
+        payload = await request.json()
+        # Se for um array com campo body, extrai o body
+        if (Array.isArray(payload) && payload.length > 0 && payload[0].body):
+            payload = payload[0].body
+        elif payload.body and isinstance(payload.body, dict):
+            payload = payload.body
+        else:
+            raise HTTPException(status_code=400, detail="Invalid JSON payload: must be a non-empty array or an object with a 'body' field.")
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid or malformed JSON payload")
 
@@ -59,6 +59,8 @@ async def process_webhook(request: Request):
     if isinstance(raw_email, str) and raw_email.strip():
         email_final = raw_email.strip()
 
+    console.log('Email extraído:', email_final);
+
     # 3. Extrair telefone
     raw_telefone = extract_field(payload, telefone_paths)
     telefone_final: Optional[str] = None
@@ -76,6 +78,9 @@ async def process_webhook(request: Request):
             # Se não encontrar no mapeamento, usar o nome original formatado
             produto_final = produto_original_nome.strip().lower()
             # Substituir espaços por hífens e remover acentos
+            produto_final = produto_final.replace(" ", "-")
+            # Remover acentos
+            import unicodedata
             produto_final = produto_final.replace(" ", "-")
             # Remover acentos
             import unicodedata
