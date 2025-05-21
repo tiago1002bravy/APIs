@@ -98,11 +98,25 @@ export async function GET() {
 
 export const runtime = "edge";
 export const preferredRegion = ["gru1"];
-export const cron = '0 8 * * *';
 
 // Configuração do cron job
 export const config = {
     runtime: 'edge',
     regions: ['gru1'], // Região de São Paulo para garantir UTC-3
     cron: '0 8 * * *' // Executa todos os dias às 8h da manhã (UTC-3)
-}; 
+};
+
+export async function POST() {
+    try {
+        const tasks = await getActiveTasks();
+        console.log(`[${new Date().toISOString()}] Consulta de tarefas (via POST) executada. Total de tarefas com status ${ALLOWED_STATUSES.join(', ')}: ${tasks.length}`);
+        return NextResponse.json({ success: true, timestamp: new Date().toISOString(), total_tasks: tasks.length, status_filter: ALLOWED_STATUSES, tasks: tasks });
+    } catch (error) {
+        console.error("Erro ao processar requisição (POST):", error instanceof Error ? error.message : "Erro desconhecido");
+        if (axios.isAxiosError(error)) {
+            if (error.response?.status === 401) { return NextResponse.json({ error: "Token de autorização inválido ou expirado" }, { status: 401 }); }
+            if (error.response?.status === 404) { return NextResponse.json({ error: "Lista não encontrada no ClickUp" }, { status: 404 }); }
+        }
+        return NextResponse.json({ error: "Erro interno do servidor ao consultar o ClickUp (POST)" }, { status: 500 });
+    }
+} 
