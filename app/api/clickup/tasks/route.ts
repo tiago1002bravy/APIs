@@ -40,11 +40,15 @@ interface AgendaCliente {
     url: string;
 }
 
+// Interface para o status das reuniões
+type ReuniaoStatus = 'sem_reunioes' | 'sem_reuniao_agendada' | 'com_reuniao_agendada';
+
 // Interface para a tarefa filtrada
 interface FilteredTask {
     id: string;
     name: string;
     agenda_clientes: AgendaCliente[];
+    status_reunioes: ReuniaoStatus;
 }
 
 // Função para buscar tarefas por assignee
@@ -140,6 +144,19 @@ function extractAgendaClientes(customFields: Array<{id: string, value: any}>): A
     return agendaItems;
 }
 
+// Função para determinar o status das reuniões
+function determinarStatusReunioes(agendaItems: AgendaCliente[]): ReuniaoStatus {
+    if (!agendaItems || agendaItems.length === 0) {
+        return 'sem_reunioes';
+    }
+
+    const temReuniaoAgendada = agendaItems.some(item => 
+        item.status.toLowerCase() === 'reunião agendada'
+    );
+
+    return temReuniaoAgendada ? 'com_reuniao_agendada' : 'sem_reuniao_agendada';
+}
+
 // Função para processar a requisição
 async function processRequest(request: Request) {
     console.log('=== INÍCIO DA REQUISIÇÃO ===');
@@ -166,10 +183,14 @@ async function processRequest(request: Request) {
             const agendaItems = extractAgendaClientes(task.custom_fields);
             console.log('Itens da agenda para tarefa', task.id, ':', agendaItems);
             
+            const statusReunioes = determinarStatusReunioes(agendaItems);
+            console.log('Status das reuniões para tarefa', task.id, ':', statusReunioes);
+            
             return {
                 id: task.id,
                 name: task.name,
-                agenda_clientes: agendaItems
+                agenda_clientes: agendaItems,
+                status_reunioes: statusReunioes
             };
         });
 
