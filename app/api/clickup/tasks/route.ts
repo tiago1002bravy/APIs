@@ -65,8 +65,7 @@ async function getTasksByAssignee(assigneeId: number): Promise<ClickUpTask[]> {
             page: 0,
             limit: 100,
             statuses: ALLOWED_STATUSES,
-            assignees: [assigneeId],
-            custom_fields: '["0218d951-f901-42f6-949c-a40e17eb77e1"]'
+            assignees: [assigneeId]
         };
 
         console.log('[ClickUp API] Iniciando requisição com params:', JSON.stringify(params, null, 2));
