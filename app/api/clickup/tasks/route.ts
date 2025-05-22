@@ -9,6 +9,13 @@ const API_TOKEN = 'pk_18911835_PZA4YYUSR3JI37KV7CMEKNV62796SML1';
 // Status permitidos para filtro
 const ALLOWED_STATUSES = ['onboarding', 'execução', 'encerramento'];
 
+// Interface para custom field (com name)
+interface CustomField {
+    id: string;
+    name: string;
+    value: any;
+}
+
 // Interface para tipagem da resposta
 interface ClickUpTask {
     id: string;
@@ -20,10 +27,7 @@ interface ClickUpTask {
         id: number;
         username: string;
     }>;
-    custom_fields: Array<{
-        id: string;
-        value: string | number | boolean;
-    }>;
+    custom_fields: CustomField[];
     tags?: Array<string | { name: string }>;
 }
 
@@ -51,6 +55,27 @@ interface FilteredTask {
     status_reunioes: ReuniaoStatus;
 }
 
+// Interface para o item da agenda no custom field
+interface AgendaItemRaw {
+    id: string;
+    name: string;
+    status: string;
+    color: string;
+    custom_type: number;
+    team_id: string;
+    deleted: boolean;
+    url: string;
+    access: boolean;
+}
+
+// Constantes para o custom field de status das reuniões
+const STATUS_REUNIOES_FIELD_ID = 'dd2d9156-b05f-481f-a2e9-d436a8aa6902';
+const STATUS_REUNIOES_OPTIONS = {
+    sem_reunioes: '75ed8dcc-e080-4f2d-bd25-2609855aad12',
+    com_reuniao_agendada: '978df944-cc82-4eef-8678-4ce7f96dad1d',
+    sem_reuniao_agendada: 'dbae5178-feab-425a-a873-ba7bb3ee32d2'
+} as const;
+
 // Função para buscar tarefas por assignee
 async function getTasksByAssignee(assigneeId: number): Promise<ClickUpTask[]> {
     try {
@@ -59,7 +84,6 @@ async function getTasksByAssignee(assigneeId: number): Promise<ClickUpTask[]> {
             'accept': 'application/json'
         };
 
-        // Parâmetros para buscar tarefas com os status específicos e assignee
         const params = {
             include_closed: 'false',
             page: 0,
@@ -68,9 +92,8 @@ async function getTasksByAssignee(assigneeId: number): Promise<ClickUpTask[]> {
             assignees: [assigneeId]
         };
 
-        console.log('[ClickUp API] Iniciando requisição com params:', JSON.stringify(params, null, 2));
-        console.log('[ClickUp API] URL:', `${CLICKUP_API_BASE_URL}/list/${LIST_ID}/task`);
-        console.log('[ClickUp API] Headers:', JSON.stringify(headers, null, 2));
+        console.log('[ClickUp API] Iniciando requisição para buscar tarefas do assignee:', assigneeId);
+        console.log('[ClickUp API] Parâmetros da requisição:', JSON.stringify(params, null, 2));
 
         const response = await axios.get<ClickUpResponse>(
             `${CLICKUP_API_BASE_URL}/list/${LIST_ID}/task`,
@@ -80,18 +103,23 @@ async function getTasksByAssignee(assigneeId: number): Promise<ClickUpTask[]> {
             }
         );
 
-        console.log('[ClickUp API] Status da resposta:', response.status);
-        console.log('[ClickUp API] Headers da resposta:', JSON.stringify(response.headers, null, 2));
-
-        if (!response.data || !Array.isArray(response.data.tasks)) {
-            console.error('[ClickUp API] Resposta inválida:', JSON.stringify(response.data, null, 2));
-            throw new Error('Resposta inválida da API do ClickUp');
-        }
-
         // Log detalhado da primeira tarefa para debug
         if (response.data.tasks.length > 0) {
-            console.log('[ClickUp API] Exemplo de tarefa:', JSON.stringify(response.data.tasks[0], null, 2));
-            console.log('[ClickUp API] Custom fields da primeira tarefa:', JSON.stringify(response.data.tasks[0].custom_fields, null, 2));
+            const primeiraTarefa = response.data.tasks[0];
+            console.log('[ClickUp API] Exemplo de tarefa completa:', JSON.stringify(primeiraTarefa, null, 2));
+            
+            // Log específico dos custom fields
+            const customFields = primeiraTarefa.custom_fields;
+            console.log('[ClickUp API] Custom Fields da primeira tarefa:', JSON.stringify(customFields, null, 2));
+            
+            // Log específico do campo de agenda
+            const agendaField = customFields.find(field => field.name === '04. Reuniões com clientes');
+            if (agendaField) {
+                console.log('[ClickUp API] Campo de agenda encontrado:', JSON.stringify(agendaField, null, 2));
+                console.log('[ClickUp API] Valor do campo de agenda:', JSON.stringify(agendaField.value, null, 2));
+            } else {
+                console.log('[ClickUp API] Campo de agenda não encontrado nos custom fields');
+            }
         } else {
             console.log('[ClickUp API] Nenhuma tarefa encontrada para o assignee:', assigneeId);
         }
@@ -123,52 +151,78 @@ async function getTasksByAssignee(assigneeId: number): Promise<ClickUpTask[]> {
 }
 
 // Função para extrair os dados do custom field de agenda
-function extractAgendaClientes(customFields: Array<{id: string, value: any}>): AgendaCliente[] {
+function extractAgendaClientes(customFields: CustomField[]): AgendaCliente[] {
     console.log('=== Extraindo dados do custom field de agenda ===');
-    console.log('Custom Fields recebidos:', JSON.stringify(customFields, null, 2));
+    console.log('Total de custom fields recebidos:', customFields.length);
     
     // Procurar pelo custom field de agenda
     const agendaField = customFields.find(field => {
-        const fieldName = field.value?.type_config?.field_inverted_name;
-        console.log('Verificando field:', {
-            id: field.id,
-            name: fieldName,
-            value: field.value
-        });
-        return fieldName === '04. Agenda cliente ok';
+        const fieldName = field.name;
+        const isAgendaField = fieldName === '04. Reuniões com clientes';
+        
+        if (isAgendaField) {
+            console.log('🔍 Campo de reuniões encontrado:', {
+                id: field.id,
+                name: fieldName,
+                valorBruto: field.value
+            });
+        }
+
+        return isAgendaField;
     });
 
     if (!agendaField) {
-        console.log('Campo de agenda não encontrado nos custom fields');
+        console.log('❌ Campo "04. Reuniões com clientes" não encontrado nos custom fields');
         return [];
     }
 
-    console.log('Agenda field encontrado:', JSON.stringify(agendaField, null, 2));
-
-    if (!agendaField.value?.value) {
-        console.log('Valor do campo de agenda está vazio');
+    // Verifica se o campo tem o valor esperado
+    let agendaItems: any[] = [];
+    
+    if (Array.isArray(agendaField.value)) {
+        // Se o valor já é um array
+        agendaItems = agendaField.value;
+    } else if (agendaField.value?.value && Array.isArray(agendaField.value.value)) {
+        // Se o valor está dentro de um objeto com propriedade value
+        agendaItems = agendaField.value.value;
+    } else {
+        console.log('❌ Valor do campo de agenda não está no formato esperado');
+        console.log('Valor recebido:', JSON.stringify(agendaField.value, null, 2));
         return [];
     }
 
-    // Verificar se o valor é um array
-    if (!Array.isArray(agendaField.value.value)) {
-        console.log('Valor não é um array:', agendaField.value.value);
-        return [];
-    }
+    console.log('📋 Total de reuniões encontradas:', agendaItems.length);
 
-    const agendaItems = agendaField.value.value.map((item: any) => {
-        console.log('Processando item da agenda:', item);
-        return {
+    // Processa cada item da agenda, mantendo todos independente do status
+    const processedItems = agendaItems.map((item: AgendaItemRaw) => {
+        // Validação apenas dos campos obrigatórios
+        if (!item.id || !item.name || !item.status) {
+            console.log('❌ Item da agenda com campos inválidos:', item);
+            return null;
+        }
+
+        // Mantém todos os campos originais da reunião
+        const processedItem = {
             id: item.id,
             name: item.name,
-            status: item.status,
-            color: item.color,
-            url: item.url
+            status: item.status.toLowerCase(), // mantém o status original, apenas em lowercase
+            color: item.color || '#000000',
+            url: item.url || ''
         };
-    });
 
-    console.log('Itens da agenda processados:', agendaItems);
-    return agendaItems;
+        console.log('✅ Reunião processada:', {
+            id: processedItem.id,
+            name: processedItem.name,
+            status: processedItem.status
+        });
+
+        return processedItem;
+    }).filter((item: AgendaCliente | null): item is AgendaCliente => item !== null);
+
+    console.log('📊 Total de reuniões processadas:', processedItems.length);
+    console.log('📋 Lista final de reuniões:', JSON.stringify(processedItems, null, 2));
+    
+    return processedItems;
 }
 
 // Função para determinar o status das reuniões
@@ -184,32 +238,88 @@ function determinarStatusReunioes(agendaItems: AgendaCliente[]): ReuniaoStatus {
     return temReuniaoAgendada ? 'com_reuniao_agendada' : 'sem_reuniao_agendada';
 }
 
+// Função para atualizar o status das reuniões no custom field
+async function atualizarStatusReunioes(taskId: string, status: ReuniaoStatus): Promise<void> {
+    try {
+        console.log('🔄 Atualizando status das reuniões para tarefa:', taskId);
+        console.log('📊 Status a ser definido:', status);
+
+        const statusUuid = STATUS_REUNIOES_OPTIONS[status];
+        if (!statusUuid) {
+            console.error('❌ UUID do status não encontrado para:', status);
+            throw new Error(`Status inválido: ${status}`);
+        }
+
+        const url = `${CLICKUP_API_BASE_URL}/task/${taskId}/field/${STATUS_REUNIOES_FIELD_ID}`;
+        const headers = {
+            'Authorization': API_TOKEN,
+            'accept': 'application/json',
+            'content-type': 'application/json'
+        };
+        const data = {
+            value: statusUuid
+        };
+
+        console.log('📤 Enviando requisição para atualizar status:', {
+            url,
+            status,
+            uuid: statusUuid
+        });
+
+        const response = await axios.post(url, data, { headers });
+
+        console.log('✅ Status atualizado com sucesso:', {
+            taskId,
+            status,
+            responseStatus: response.status
+        });
+    } catch (error) {
+        console.error('💥 Erro ao atualizar status das reuniões:', error instanceof Error ? {
+            message: error.message,
+            stack: error.stack,
+            name: error.name
+        } : 'Erro desconhecido');
+
+        if (axios.isAxiosError(error)) {
+            console.error('Detalhes do erro Axios:', {
+                status: error.response?.status,
+                statusText: error.response?.statusText,
+                data: error.response?.data
+            });
+        }
+        throw error;
+    }
+}
+
 // Função para processar a requisição
 async function processRequest(request: Request) {
-    console.log('=== INÍCIO DA REQUISIÇÃO ===');
-    console.log('URL:', request.url);
-    console.log('Método:', request.method);
+    console.log('🚀 === INÍCIO DA REQUISIÇÃO ===');
+    console.log('📝 URL:', request.url);
+    console.log('🔧 Método:', request.method);
+    console.log('⏰ Timestamp:', new Date().toISOString());
     
     try {
         const { searchParams } = new URL(request.url);
         const assigneeId = searchParams.get('assignee');
-        console.log('Assignee ID recebido:', assigneeId);
+        console.log('👤 Assignee ID recebido:', assigneeId);
 
         if (!assigneeId) {
-            console.log('Erro: ID do assignee não fornecido');
+            console.log('❌ Erro: ID do assignee não fornecido');
             return NextResponse.json({ 
                 error: 'ID do assignee é obrigatório' 
             }, { status: 400 });
         }
 
         if (isNaN(parseInt(assigneeId))) {
-            console.log('Erro: ID do assignee inválido:', assigneeId);
+            console.log('❌ Erro: ID do assignee inválido:', assigneeId);
             return NextResponse.json({ 
                 error: 'ID do assignee deve ser um número válido' 
             }, { status: 400 });
         }
 
+        console.log('✅ Iniciando busca de tarefas para assignee:', assigneeId);
         const tasks = await getTasksByAssignee(parseInt(assigneeId));
+        console.log('📊 Total de tarefas encontradas:', tasks.length);
         
         if (!Array.isArray(tasks)) {
             console.error('Erro: Resposta inválida do ClickUp - tasks não é um array:', tasks);
@@ -221,7 +331,7 @@ async function processRequest(request: Request) {
         console.log('Tarefas brutas recebidas:', JSON.stringify(tasks[0], null, 2)); // Log da primeira tarefa para debug
         
         // Filtrar e transformar as tarefas
-        const filteredTasks: FilteredTask[] = tasks.map(task => {
+        const filteredTasks: FilteredTask[] = await Promise.all(tasks.map(async task => {
             console.log('Processando tarefa:', task.id, task.name);
             const agendaItems = extractAgendaClientes(task.custom_fields);
             console.log('Itens da agenda para tarefa', task.id, ':', agendaItems);
@@ -229,13 +339,21 @@ async function processRequest(request: Request) {
             const statusReunioes = determinarStatusReunioes(agendaItems);
             console.log('Status das reuniões para tarefa', task.id, ':', statusReunioes);
             
+            // Atualiza o status no custom field
+            try {
+                await atualizarStatusReunioes(task.id, statusReunioes);
+            } catch (error) {
+                console.error(`Erro ao atualizar status para tarefa ${task.id}:`, error);
+                // Continua o processamento mesmo se houver erro na atualização
+            }
+            
             return {
                 id: task.id,
                 name: task.name,
                 agenda_clientes: agendaItems,
                 status_reunioes: statusReunioes
             };
-        });
+        }));
 
         console.log(`[${new Date().toISOString()}] Consulta de tarefas executada para assignee ${assigneeId}. Total de tarefas: ${tasks.length}`);
 
@@ -248,7 +366,7 @@ async function processRequest(request: Request) {
         });
 
     } catch (error) {
-        console.error('Erro ao processar requisição:', error instanceof Error ? {
+        console.error('💥 Erro ao processar requisição:', error instanceof Error ? {
             message: error.message,
             stack: error.stack,
             name: error.name
