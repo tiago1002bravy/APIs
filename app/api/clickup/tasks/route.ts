@@ -42,17 +42,23 @@ interface AgendaCliente {
     status: string;
     color: string;
     url: string;
+    data_reuniao?: string; // Data da reunião
+    dias_desde_reuniao?: number; // Dias desde a última reunião
 }
 
 // Interface para o status das reuniões
 type ReuniaoStatus = 'sem_reunioes' | 'sem_reuniao_agendada' | 'com_reuniao_agendada';
 
-// Interface para a tarefa filtrada
+// Interface atualizada para a tarefa filtrada
 interface FilteredTask {
     id: string;
     name: string;
-    agenda_clientes: AgendaCliente[];
     status_reunioes: ReuniaoStatus;
+    data_reuniao?: string;
+    dias_desde_reuniao?: number;
+    atualizacao_status_reunioes?: number;
+    atualizacao_data_ultima_reuniao?: number;
+    agenda_clientes: AgendaCliente[];
 }
 
 // Interface para o item da agenda no custom field
@@ -68,13 +74,24 @@ interface AgendaItemRaw {
     access: boolean;
 }
 
-// Constantes para o custom field de status das reuniões
+// Constantes para os custom fields
 const STATUS_REUNIOES_FIELD_ID = 'dd2d9156-b05f-481f-a2e9-d436a8aa6902';
+const DATA_ULTIMA_REUNIAO_FIELD_ID = 'ee9b92c6-04eb-40fd-aee5-4190219fe3be';
 const STATUS_REUNIOES_OPTIONS = {
     sem_reunioes: '75ed8dcc-e080-4f2d-bd25-2609855aad12',
     com_reuniao_agendada: '978df944-cc82-4eef-8678-4ce7f96dad1d',
     sem_reuniao_agendada: 'dbae5178-feab-425a-a873-ba7bb3ee32d2'
 } as const;
+
+// Interface para a resposta da API de detalhes da tarefa
+interface ClickUpTaskDetails {
+    id: string;
+    name: string;
+    start_date: string; // Data da reunião
+    status: {
+        status: string;
+    };
+}
 
 // Função para buscar tarefas por assignee
 async function getTasksByAssignee(assigneeId: number): Promise<ClickUpTask[]> {
@@ -150,8 +167,182 @@ async function getTasksByAssignee(assigneeId: number): Promise<ClickUpTask[]> {
     }
 }
 
+// Função para buscar detalhes de uma tarefa específica
+async function getTaskDetails(taskId: string): Promise<ClickUpTaskDetails> {
+    try {
+        console.log('🔍 Buscando detalhes da tarefa:', taskId);
+        
+        const url = `${CLICKUP_API_BASE_URL}/task/${taskId}`;
+        const headers = {
+            'Authorization': API_TOKEN,
+            'accept': 'application/json'
+        };
+
+        const response = await axios.get<ClickUpTaskDetails>(url, { headers });
+        
+        console.log('✅ Detalhes da tarefa encontrados:', {
+            id: response.data.id,
+            name: response.data.name,
+            start_date: response.data.start_date
+        });
+
+        return response.data;
+    } catch (error) {
+        console.error('💥 Erro ao buscar detalhes da tarefa:', error instanceof Error ? {
+            message: error.message,
+            stack: error.stack,
+            name: error.name
+        } : 'Erro desconhecido');
+
+        if (axios.isAxiosError(error)) {
+            console.error('Detalhes do erro Axios:', {
+                status: error.response?.status,
+                statusText: error.response?.statusText,
+                data: error.response?.data
+            });
+        }
+        throw error;
+    }
+}
+
+// Função para calcular dias entre duas datas
+function calcularDiasEntreDatas(dataInicial: string | number, dataFinal: Date = new Date()): number {
+    let inicio: Date;
+    let timestampBRT: number;
+    
+    // Verifica se a data inicial é um timestamp em milissegundos
+    if (typeof dataInicial === 'number' || !isNaN(Number(dataInicial))) {
+        // Converte o timestamp UTC para BRT (UTC-3)
+        timestampBRT = Number(dataInicial) - (3 * 60 * 60 * 1000); // Subtrai 3 horas em milissegundos
+        inicio = new Date(timestampBRT);
+    } else {
+        timestampBRT = new Date(dataInicial).getTime() - (3 * 60 * 60 * 1000);
+        inicio = new Date(dataInicial);
+    }
+    
+    // Ajusta a data final para BRT também
+    const fim = new Date(dataFinal.getTime() - (3 * 60 * 60 * 1000));
+    
+    // Remove as horas para comparar apenas as datas
+    inicio.setHours(0, 0, 0, 0);
+    fim.setHours(0, 0, 0, 0);
+    
+    const diffTime = Math.abs(fim.getTime() - inicio.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    console.log('📅 Cálculo de dias:', {
+        dataInicialUTC: new Date(Number(dataInicial)).toISOString(),
+        dataInicialBRT: inicio.toISOString(),
+        dataFinalBRT: fim.toISOString(),
+        diasCalculados: diffDays,
+        timestampOriginal: dataInicial,
+        timestampBRT
+    });
+    
+    return diffDays;
+}
+
+// Função para processar as datas das reuniões
+async function processarDatasReunioes(agendaItems: AgendaCliente[]): Promise<{
+    agendaAtualizada: AgendaCliente[];
+    ultimaReuniao?: {
+        data: string;
+        diasDesde: number;
+    };
+}> {
+    console.log('=== INÍCIO DO PROCESSAMENTO DE DATAS ===');
+    console.log('📋 Dados de entrada:', {
+        totalReunioes: agendaItems.length,
+        reunioes: agendaItems.map(item => ({
+            id: item.id,
+            name: item.name,
+            status: item.status
+        }))
+    });
+    
+    // Filtra apenas reuniões realizadas
+    const reunioesRealizadas = agendaItems.filter(item => 
+        item.status.toLowerCase() === 'realizada'
+    );
+
+    console.log('📊 Reuniões realizadas:', reunioesRealizadas.length);
+
+    if (reunioesRealizadas.length === 0) {
+        console.log('ℹ️ Nenhuma reunião realizada encontrada');
+        return { agendaAtualizada: agendaItems };
+    }
+
+    // Busca detalhes de cada reunião realizada
+    const reunioesProcessadas = await Promise.all(
+        reunioesRealizadas.map(async (reuniao) => {
+            try {
+                const detalhes = await getTaskDetails(reuniao.id);
+                
+                if (detalhes.start_date) {
+                    const diasDesdeReuniao = calcularDiasEntreDatas(detalhes.start_date);
+                    console.log(`📊 Reunião "${reuniao.name}": ${diasDesdeReuniao} dias desde a data`);
+                    
+                    return {
+                        ...reuniao,
+                        data_reuniao: detalhes.start_date,
+                        dias_desde_reuniao: diasDesdeReuniao,
+                        timestamp: Number(detalhes.start_date) // Adiciona timestamp para ordenação
+                    };
+                }
+                
+                return {
+                    ...reuniao,
+                    timestamp: 0 // Caso não tenha data, coloca no início
+                };
+            } catch (error) {
+                console.error(`❌ Erro ao processar reunião ${reuniao.id}:`, error);
+                return {
+                    ...reuniao,
+                    timestamp: 0 // Em caso de erro, coloca no início
+                };
+            }
+        })
+    );
+
+    // Ordena as reuniões por data (mais recente primeiro)
+    const reunioesOrdenadas = reunioesProcessadas.sort((a, b) => b.timestamp - a.timestamp);
+
+    // Atualiza a lista original com as reuniões processadas
+    const agendaAtualizada = agendaItems.map(item => {
+        const reuniaoProcessada = reunioesOrdenadas.find(r => r.id === item.id);
+        if (reuniaoProcessada) {
+            const { timestamp, ...reuniaoSemTimestamp } = reuniaoProcessada;
+            return reuniaoSemTimestamp;
+        }
+        return item;
+    });
+
+    // Pega a primeira reunião da lista ordenada (a mais recente)
+    const ultimaReuniao = reunioesOrdenadas[0];
+    
+    if (ultimaReuniao && ultimaReuniao.data_reuniao) {
+        console.log('📅 Última reunião encontrada:', {
+            nome: ultimaReuniao.name,
+            data: ultimaReuniao.data_reuniao,
+            dias_desde: ultimaReuniao.dias_desde_reuniao,
+            timestamp: ultimaReuniao.timestamp
+        });
+
+        return {
+            agendaAtualizada,
+            ultimaReuniao: {
+                data: ultimaReuniao.data_reuniao,
+                diasDesde: ultimaReuniao.dias_desde_reuniao!
+            }
+        };
+    }
+
+    console.log('=== FIM DO PROCESSAMENTO DE DATAS ===');
+    return { agendaAtualizada };
+}
+
 // Função para extrair os dados do custom field de agenda
-function extractAgendaClientes(customFields: CustomField[]): AgendaCliente[] {
+async function extractAgendaClientes(customFields: CustomField[]): Promise<AgendaCliente[]> {
     console.log('=== Extraindo dados do custom field de agenda ===');
     console.log('Total de custom fields recebidos:', customFields.length);
     
@@ -219,10 +410,13 @@ function extractAgendaClientes(customFields: CustomField[]): AgendaCliente[] {
         return processedItem;
     }).filter((item: AgendaCliente | null): item is AgendaCliente => item !== null);
 
-    console.log('📊 Total de reuniões processadas:', processedItems.length);
-    console.log('📋 Lista final de reuniões:', JSON.stringify(processedItems, null, 2));
+    // Processa as datas das reuniões
+    const { agendaAtualizada, ultimaReuniao } = await processarDatasReunioes(processedItems);
+
+    console.log('📊 Total de itens processados:', agendaAtualizada.length);
+    console.log('📋 Itens finais da agenda:', JSON.stringify(agendaAtualizada, null, 2));
     
-    return processedItems;
+    return agendaAtualizada;
 }
 
 // Função para determinar o status das reuniões
@@ -239,7 +433,7 @@ function determinarStatusReunioes(agendaItems: AgendaCliente[]): ReuniaoStatus {
 }
 
 // Função para atualizar o status das reuniões no custom field
-async function atualizarStatusReunioes(taskId: string, status: ReuniaoStatus): Promise<void> {
+async function atualizarStatusReunioes(taskId: string, status: ReuniaoStatus): Promise<{ status: number } | undefined> {
     try {
         console.log('🔄 Atualizando status das reuniões para tarefa:', taskId);
         console.log('📊 Status a ser definido:', status);
@@ -273,20 +467,61 @@ async function atualizarStatusReunioes(taskId: string, status: ReuniaoStatus): P
             status,
             responseStatus: response.status
         });
-    } catch (error) {
-        console.error('💥 Erro ao atualizar status das reuniões:', error instanceof Error ? {
-            message: error.message,
-            stack: error.stack,
-            name: error.name
-        } : 'Erro desconhecido');
 
-        if (axios.isAxiosError(error)) {
-            console.error('Detalhes do erro Axios:', {
-                status: error.response?.status,
-                statusText: error.response?.statusText,
-                data: error.response?.data
-            });
-        }
+        return { status: response.status };
+    } catch (error) {
+        console.error('💥 Erro ao atualizar status das reuniões:', error);
+        throw error;
+    }
+}
+
+// Função para atualizar a data da última reunião no custom field
+async function atualizarDataUltimaReuniao(taskId: string, dataReuniao: string): Promise<{ status: number } | undefined> {
+    try {
+        console.log('=== INÍCIO DA ATUALIZAÇÃO DA DATA DA ÚLTIMA REUNIÃO ===');
+        console.log('📅 Dados da atualização:', {
+            taskId,
+            dataReuniao,
+            fieldId: DATA_ULTIMA_REUNIAO_FIELD_ID
+        });
+
+        const url = `${CLICKUP_API_BASE_URL}/task/${taskId}/field/${DATA_ULTIMA_REUNIAO_FIELD_ID}`;
+        const headers = {
+            'Authorization': API_TOKEN,
+            'accept': 'application/json',
+            'content-type': 'application/json'
+        };
+
+        // Usando exatamente o mesmo formato do curl
+        const data = {
+            value_options: {
+                time: true
+            },
+            value: dataReuniao
+        };
+
+        console.log('📤 Requisição completa:', {
+            url,
+            method: 'POST',
+            headers: {
+                ...headers,
+                'Authorization': '***' // Ocultando o token nos logs
+            },
+            data: JSON.stringify(data, null, 2)
+        });
+
+        const response = await axios.post(url, data, { headers });
+
+        console.log('✅ Resposta da API:', {
+            status: response.status,
+            statusText: response.statusText,
+            data: response.data
+        });
+        console.log('=== FIM DA ATUALIZAÇÃO DA DATA DA ÚLTIMA REUNIÃO ===');
+
+        return { status: response.status };
+    } catch (error) {
+        console.error('💥 Erro ao atualizar data da última reunião:', error);
         throw error;
     }
 }
@@ -333,25 +568,63 @@ async function processRequest(request: Request) {
         // Filtrar e transformar as tarefas
         const filteredTasks: FilteredTask[] = await Promise.all(tasks.map(async task => {
             console.log('Processando tarefa:', task.id, task.name);
-            const agendaItems = extractAgendaClientes(task.custom_fields);
+            const agendaItems = await extractAgendaClientes(task.custom_fields);
             console.log('Itens da agenda para tarefa', task.id, ':', agendaItems);
             
             const statusReunioes = determinarStatusReunioes(agendaItems);
             console.log('Status das reuniões para tarefa', task.id, ':', statusReunioes);
             
-            // Atualiza o status no custom field
+            // Processa as datas das reuniões
+            const { agendaAtualizada, ultimaReuniao } = await processarDatasReunioes(agendaItems);
+            
+            // Inicializa os status das atualizações
+            let statusReunioesCode: number | undefined;
+            let dataReuniaoCode: number | undefined;
+            
+            // Atualiza os custom fields
             try {
-                await atualizarStatusReunioes(task.id, statusReunioes);
+                // Atualiza o status das reuniões
+                const statusResponse = await atualizarStatusReunioes(task.id, statusReunioes);
+                statusReunioesCode = statusResponse?.status || 200;
+                console.log('✅ Status das reuniões atualizado com sucesso para tarefa:', task.id);
+
+                // Atualiza a data da última reunião se houver uma reunião realizada
+                if (ultimaReuniao?.data) {
+                    const dataResponse = await atualizarDataUltimaReuniao(task.id, ultimaReuniao.data);
+                    dataReuniaoCode = dataResponse?.status || 200;
+                    console.log('✅ Data da última reunião atualizada com sucesso para tarefa:', task.id);
+                } else {
+                    console.log('ℹ️ Nenhuma reunião realizada encontrada para atualizar a data em:', task.id);
+                    dataReuniaoCode = 204; // No Content
+                }
             } catch (error) {
-                console.error(`Erro ao atualizar status para tarefa ${task.id}:`, error);
-                // Continua o processamento mesmo se houver erro na atualização
+                console.error(`❌ Erro ao atualizar custom fields para tarefa ${task.id}:`, error);
+                
+                if (axios.isAxiosError(error)) {
+                    // Se houver erro na atualização do status
+                    if (!statusReunioesCode) {
+                        statusReunioesCode = error.response?.status || 500;
+                    }
+                    // Se houver erro na atualização da data
+                    if (!dataReuniaoCode && ultimaReuniao?.data) {
+                        dataReuniaoCode = error.response?.status || 500;
+                    }
+                } else {
+                    // Erro genérico
+                    if (!statusReunioesCode) statusReunioesCode = 500;
+                    if (!dataReuniaoCode && ultimaReuniao?.data) dataReuniaoCode = 500;
+                }
             }
             
             return {
                 id: task.id,
                 name: task.name,
-                agenda_clientes: agendaItems,
-                status_reunioes: statusReunioes
+                status_reunioes: statusReunioes,
+                data_reuniao: ultimaReuniao?.data,
+                dias_desde_reuniao: ultimaReuniao?.diasDesde,
+                atualizacao_status_reunioes: statusReunioesCode,
+                atualizacao_data_ultima_reuniao: dataReuniaoCode,
+                agenda_clientes: agendaAtualizada
             };
         }));
 
