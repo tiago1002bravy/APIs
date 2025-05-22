@@ -93,6 +93,9 @@ interface ClickUpTaskDetails {
     };
 }
 
+// Função para criar um delay
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 // Função para buscar tarefas por assignee
 async function getTasksByAssignee(assigneeId: number): Promise<ClickUpTask[]> {
     try {
@@ -563,70 +566,84 @@ async function processRequest(request: Request) {
             }, { status: 500 });
         }
 
-        console.log('Tarefas brutas recebidas:', JSON.stringify(tasks[0], null, 2)); // Log da primeira tarefa para debug
+        // Processar as tarefas sequencialmente com delay
+        const filteredTasks: FilteredTask[] = [];
         
-        // Filtrar e transformar as tarefas
-        const filteredTasks: FilteredTask[] = await Promise.all(tasks.map(async task => {
-            console.log('Processando tarefa:', task.id, task.name);
-            const agendaItems = await extractAgendaClientes(task.custom_fields);
-            console.log('Itens da agenda para tarefa', task.id, ':', agendaItems);
+        for (const task of tasks) {
+            console.log('⏳ Processando tarefa:', task.id, task.name);
             
-            const statusReunioes = determinarStatusReunioes(agendaItems);
-            console.log('Status das reuniões para tarefa', task.id, ':', statusReunioes);
-            
-            // Processa as datas das reuniões
-            const { agendaAtualizada, ultimaReuniao } = await processarDatasReunioes(agendaItems);
-            
-            // Inicializa os status das atualizações
-            let statusReunioesCode: number | undefined;
-            let dataReuniaoCode: number | undefined;
-            
-            // Atualiza os custom fields
             try {
-                // Atualiza o status das reuniões
-                const statusResponse = await atualizarStatusReunioes(task.id, statusReunioes);
-                statusReunioesCode = statusResponse?.status || 200;
-                console.log('✅ Status das reuniões atualizado com sucesso para tarefa:', task.id);
-
-                // Atualiza a data da última reunião se houver uma reunião realizada
-                if (ultimaReuniao?.data) {
-                    const dataResponse = await atualizarDataUltimaReuniao(task.id, ultimaReuniao.data);
-                    dataReuniaoCode = dataResponse?.status || 200;
-                    console.log('✅ Data da última reunião atualizada com sucesso para tarefa:', task.id);
-                } else {
-                    console.log('ℹ️ Nenhuma reunião realizada encontrada para atualizar a data em:', task.id);
-                    dataReuniaoCode = 204; // No Content
-                }
-            } catch (error) {
-                console.error(`❌ Erro ao atualizar custom fields para tarefa ${task.id}:`, error);
+                const agendaItems = await extractAgendaClientes(task.custom_fields);
+                console.log('Itens da agenda para tarefa', task.id, ':', agendaItems);
                 
-                if (axios.isAxiosError(error)) {
-                    // Se houver erro na atualização do status
-                    if (!statusReunioesCode) {
-                        statusReunioesCode = error.response?.status || 500;
+                const statusReunioes = determinarStatusReunioes(agendaItems);
+                console.log('Status das reuniões para tarefa', task.id, ':', statusReunioes);
+                
+                // Processa as datas das reuniões
+                const { agendaAtualizada, ultimaReuniao } = await processarDatasReunioes(agendaItems);
+                
+                // Inicializa os status das atualizações
+                let statusReunioesCode: number | undefined;
+                let dataReuniaoCode: number | undefined;
+                
+                // Atualiza os custom fields
+                try {
+                    // Atualiza o status das reuniões
+                    const statusResponse = await atualizarStatusReunioes(task.id, statusReunioes);
+                    statusReunioesCode = statusResponse?.status || 200;
+                    console.log('✅ Status das reuniões atualizado com sucesso para tarefa:', task.id);
+
+                    // Atualiza a data da última reunião se houver uma reunião realizada
+                    if (ultimaReuniao?.data) {
+                        const dataResponse = await atualizarDataUltimaReuniao(task.id, ultimaReuniao.data);
+                        dataReuniaoCode = dataResponse?.status || 200;
+                        console.log('✅ Data da última reunião atualizada com sucesso para tarefa:', task.id);
+                    } else {
+                        console.log('ℹ️ Nenhuma reunião realizada encontrada para atualizar a data em:', task.id);
+                        dataReuniaoCode = 204; // No Content
                     }
-                    // Se houver erro na atualização da data
-                    if (!dataReuniaoCode && ultimaReuniao?.data) {
-                        dataReuniaoCode = error.response?.status || 500;
+                } catch (error) {
+                    console.error(`❌ Erro ao atualizar custom fields para tarefa ${task.id}:`, error);
+                    
+                    if (axios.isAxiosError(error)) {
+                        // Se houver erro na atualização do status
+                        if (!statusReunioesCode) {
+                            statusReunioesCode = error.response?.status || 500;
+                        }
+                        // Se houver erro na atualização da data
+                        if (!dataReuniaoCode && ultimaReuniao?.data) {
+                            dataReuniaoCode = error.response?.status || 500;
+                        }
+                    } else {
+                        // Erro genérico
+                        if (!statusReunioesCode) statusReunioesCode = 500;
+                        if (!dataReuniaoCode && ultimaReuniao?.data) dataReuniaoCode = 500;
                     }
-                } else {
-                    // Erro genérico
-                    if (!statusReunioesCode) statusReunioesCode = 500;
-                    if (!dataReuniaoCode && ultimaReuniao?.data) dataReuniaoCode = 500;
                 }
+                
+                filteredTasks.push({
+                    id: task.id,
+                    name: task.name,
+                    status_reunioes: statusReunioes,
+                    data_reuniao: ultimaReuniao?.data,
+                    dias_desde_reuniao: ultimaReuniao?.diasDesde,
+                    atualizacao_status_reunioes: statusReunioesCode,
+                    atualizacao_data_ultima_reuniao: dataReuniaoCode,
+                    agenda_clientes: agendaAtualizada
+                });
+            } catch (error) {
+                console.error(`❌ Erro ao processar tarefa ${task.id}:`, error);
+                // Adiciona a tarefa mesmo com erro, mas com status de erro
+                filteredTasks.push({
+                    id: task.id,
+                    name: task.name,
+                    status_reunioes: 'sem_reunioes',
+                    atualizacao_status_reunioes: 500,
+                    atualizacao_data_ultima_reuniao: 500,
+                    agenda_clientes: []
+                });
             }
-            
-            return {
-                id: task.id,
-                name: task.name,
-                status_reunioes: statusReunioes,
-                data_reuniao: ultimaReuniao?.data,
-                dias_desde_reuniao: ultimaReuniao?.diasDesde,
-                atualizacao_status_reunioes: statusReunioesCode,
-                atualizacao_data_ultima_reuniao: dataReuniaoCode,
-                agenda_clientes: agendaAtualizada
-            };
-        }));
+        }
 
         console.log(`[${new Date().toISOString()}] Consulta de tarefas executada para assignee ${assigneeId}. Total de tarefas: ${tasks.length}`);
 
